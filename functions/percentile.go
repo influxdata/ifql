@@ -159,7 +159,7 @@ func createPercentileTransformation(id execute.DatasetID, mode execute.Accumulat
 		Quantile:    ps.Percentile,
 		Compression: ps.Compression,
 	}
-	t, d := execute.NewAggregateTransformationAndDataset(id, mode, a.Bounds(), agg, ps.AggregateConfig, a.Allocator())
+	t, d := execute.NewAggregateTransformationAndDataset(id, mode, agg, ps.AggregateConfig, a.Allocator())
 	return t, d, nil
 }
 
@@ -214,7 +214,7 @@ func createExactPercentileTransformation(id execute.DatasetID, mode execute.Accu
 	agg := &ExactPercentileAgg{
 		Quantile: ps.Percentile,
 	}
-	t, d := execute.NewAggregateTransformationAndDataset(id, mode, a.Bounds(), agg, ps.AggregateConfig, a.Allocator())
+	t, d := execute.NewAggregateTransformationAndDataset(id, mode, agg, ps.AggregateConfig, a.Allocator())
 	return t, d, nil
 }
 

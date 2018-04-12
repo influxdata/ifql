@@ -226,9 +226,9 @@ func TestCumulativeSum_Process(t *testing.T) {
 					{Label: "t", Type: execute.TString, Kind: execute.TagColKind},
 				},
 				Data: [][]interface{}{
-					{execute.Time(0), int64(2),  "tag0"},
-					{execute.Time(1), int64(3),  "tag0"},
-					{execute.Time(2), int64(6),  "tag1"},
+					{execute.Time(0), int64(2), "tag0"},
+					{execute.Time(1), int64(3), "tag0"},
+					{execute.Time(2), int64(6), "tag1"},
 					{execute.Time(3), int64(10), "tag1"},
 					{execute.Time(4), int64(12), "tag0"},
 					{execute.Time(5), int64(18), "tag0"},

@@ -3,10 +3,9 @@ package execute
 import "github.com/influxdata/ifql/query"
 
 type aggregateTransformation struct {
-	d      Dataset
-	cache  BlockBuilderCache
-	bounds Bounds
-	agg    Aggregate
+	d     Dataset
+	cache BlockBuilderCache
+	agg   Aggregate
 
 	config AggregateConfig
 }
@@ -24,20 +23,19 @@ func (c *AggregateConfig) ReadArgs(args query.Arguments) error {
 	return nil
 }
 
-func NewAggregateTransformation(d Dataset, c BlockBuilderCache, bounds Bounds, agg Aggregate, config AggregateConfig) *aggregateTransformation {
+func NewAggregateTransformation(d Dataset, c BlockBuilderCache, agg Aggregate, config AggregateConfig) *aggregateTransformation {
 	return &aggregateTransformation{
 		d:      d,
 		cache:  c,
-		bounds: bounds,
 		agg:    agg,
 		config: config,
 	}
 }
 
-func NewAggregateTransformationAndDataset(id DatasetID, mode AccumulationMode, bounds Bounds, agg Aggregate, config AggregateConfig, a *Allocator) (*aggregateTransformation, Dataset) {
+func NewAggregateTransformationAndDataset(id DatasetID, mode AccumulationMode, agg Aggregate, config AggregateConfig, a *Allocator) (*aggregateTransformation, Dataset) {
 	cache := NewBlockBuilderCache(a)
 	d := NewDataset(id, mode, cache)
-	return NewAggregateTransformation(d, cache, bounds, agg, config), d
+	return NewAggregateTransformation(d, cache, agg, config), d
 }
 
 func (t *aggregateTransformation) RetractBlock(id DatasetID, meta BlockMetadata) error {
@@ -47,10 +45,7 @@ func (t *aggregateTransformation) RetractBlock(id DatasetID, meta BlockMetadata)
 }
 
 func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
-	builder, new := t.cache.BlockBuilder(blockMetadata{
-		bounds: t.bounds,
-		tags:   b.Tags(),
-	})
+	builder, new := t.cache.BlockBuilder(b)
 	if new {
 		cols := b.Cols()
 		for j, c := range cols {

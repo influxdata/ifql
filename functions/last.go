@@ -117,7 +117,7 @@ func createLastTransformation(id execute.DatasetID, mode execute.AccumulationMod
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid spec type %T", ps)
 	}
-	t, d := execute.NewRowSelectorTransformationAndDataset(id, mode, a.Bounds(), new(LastSelector), ps.SelectorConfig, a.Allocator())
+	t, d := execute.NewRowSelectorTransformationAndDataset(id, mode, new(LastSelector), ps.SelectorConfig, a.Allocator())
 	return t, d, nil
 }
 

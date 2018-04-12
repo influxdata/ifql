@@ -117,7 +117,7 @@ func createFirstTransformation(id execute.DatasetID, mode execute.AccumulationMo
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid spec type %T", ps)
 	}
-	t, d := execute.NewIndexSelectorTransformationAndDataset(id, mode, a.Bounds(), new(FirstSelector), ps.SelectorConfig, a.Allocator())
+	t, d := execute.NewIndexSelectorTransformationAndDataset(id, mode, new(FirstSelector), ps.SelectorConfig, a.Allocator())
 	return t, d, nil
 }
 

@@ -114,7 +114,7 @@ func createSampleTransformation(id execute.DatasetID, mode execute.AccumulationM
 		N:   int(ps.N),
 		Pos: int(ps.Pos),
 	}
-	t, d := execute.NewIndexSelectorTransformationAndDataset(id, mode, a.Bounds(), ss, ps.SelectorConfig, a.Allocator())
+	t, d := execute.NewIndexSelectorTransformationAndDataset(id, mode, ss, ps.SelectorConfig, a.Allocator())
 	return t, d, nil
 }
 

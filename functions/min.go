@@ -81,7 +81,7 @@ func createMinTransformation(id execute.DatasetID, mode execute.AccumulationMode
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid spec type %T", ps)
 	}
-	t, d := execute.NewRowSelectorTransformationAndDataset(id, mode, a.Bounds(), new(MinSelector), ps.SelectorConfig, a.Allocator())
+	t, d := execute.NewRowSelectorTransformationAndDataset(id, mode, new(MinSelector), ps.SelectorConfig, a.Allocator())
 	return t, d, nil
 }
 
