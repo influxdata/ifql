@@ -7,7 +7,6 @@ import (
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/semantic"
-	"github.com/pkg/errors"
 )
 
 const WindowKind = "window"
@@ -65,9 +64,10 @@ func createWindowOpSpec(args query.Arguments, a *query.Administration) (query.Op
 		spec.Start = start
 	}
 
-	if !everySet && !periodSet {
-		return nil, errors.New(`window function requires at least one of "every" or "period" to be set`)
-	}
+	//if !everySet && !periodSet {
+	//	return nil, errors.New(`window function requires at least one of "every" or "period" to be set`)
+	//}
+
 	// Apply defaults
 	if !everySet {
 		spec.Every = spec.Period
@@ -213,6 +213,9 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 }
 
 func (t *fixedWindowTransformation) getWindowBounds(now execute.Time) []execute.Bounds {
+	if t.w.Every == 0 && t.w.Period == 0 {
+		return []execute.Bounds{t.bounds}
+	}
 	stop := now.Truncate(t.w.Every) + execute.Time(t.offset)
 	if now >= stop {
 		stop += execute.Time(t.w.Every)
