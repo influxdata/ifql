@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/influxdata/ifql/query/execute"
@@ -13,15 +12,21 @@ import (
 
 type Writer struct{}
 
+type response struct {
+	Results []Result `json:"results"`
+	Err     string   `json:"err"`
+}
+
+
 func (Writer) WriteTo(w io.Writer, results map[string]execute.Result) error {
 	// TODO: This code was copy pasted from the hackathon branch that enabled Chronograf to talk to IFQL.
 	// It may need a refactor and it will tests to ensure that it accurately transforms the data to the correct format.
 	resp := response{
-		Results: make([]result, len(results)),
+		Results: make([]Result, len(results)),
 	}
 
 	// This process needs to be deterministic.
-	// Process results in lexigraphical order.
+	// Process results in lexicographical order.
 	order := make([]string, 0, len(results))
 	for name := range results {
 		order = append(order, name)
@@ -31,17 +36,26 @@ func (Writer) WriteTo(w io.Writer, results map[string]execute.Result) error {
 	for i, name := range order {
 		r := results[name]
 		blocks := r.Blocks()
-		seriesID := 0
-		result := result{}
+		result := Result{StatementID: i}
+
 		err := blocks.Do(func(b execute.Block) error {
-			s := series{Tags: b.Tags()}
-			for _, c := range b.Cols() {
-				if !c.Common {
-					s.Columns = append(s.Columns, c.Label)
+			var r Row
+
+			for k, v := range b.Tags() {
+				if k == "_measurement" {
+					r.Name = v
+				} else if k != "_field" {
+					r.Tags[k] = v
 				}
 			}
-			seriesID++
-			s.Name = strconv.Itoa(seriesID)
+
+			for _, c := range b.Cols() {
+				if !c.Common {
+					r.Columns = append(r.Columns, c.Label)
+				}
+
+			}
+
 			times := b.Times()
 			times.DoTime(func(ts []execute.Time, rr execute.RowReader) {
 				for i := range ts {
@@ -67,10 +81,12 @@ func (Writer) WriteTo(w io.Writer, results map[string]execute.Result) error {
 							v = append(v, "unknown")
 						}
 					}
-					s.Values = append(s.Values, v)
+
+					r.Values = append(r.Values, v)
 				}
 			})
-			result.Series = append(result.Series, s)
+
+			result.Series = append(result.Series, &r)
 			return nil
 		})
 		if err != nil {
@@ -82,18 +98,4 @@ func (Writer) WriteTo(w io.Writer, results map[string]execute.Result) error {
 	return json.NewEncoder(w).Encode(resp)
 }
 
-type response struct {
-	Results []result `json:"results"`
-	Err     string   `json:"err"`
-}
 
-type result struct {
-	Series []series `json:"series"`
-}
-
-type series struct {
-	Name    string            `json:"name"`
-	Columns []string          `json:"columns"`
-	Tags    map[string]string `json:"tags"`
-	Values  [][]interface{}   `json:"values"`
-}
