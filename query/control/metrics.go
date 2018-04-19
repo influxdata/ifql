@@ -3,49 +3,49 @@ package control
 import "github.com/prometheus/client_golang/prometheus"
 
 var compilingGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "ifql_control_current_compiling",
-	Help: "Number of queries currently compiling",
+	Name: "query_control_compiling_active",
+	Help: "Number of queries actively compiling",
 })
 var queueingGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "ifql_control_current_queueing",
-	Help: "Number of queries currently queueing",
+	Name: "query_control_queueing_active",
+	Help: "Number of queries actively queueing",
 })
 var requeueingGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "ifql_control_current_requeueing",
-	Help: "Number of queries currently requeueing",
+	Name: "query_control_requeueing_active",
+	Help: "Number of queries actively requeueing",
 })
 var planningGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "ifql_control_current_planning",
-	Help: "Number of queries currently planning",
+	Name: "query_control_planning_active",
+	Help: "Number of queries actively planning",
 })
 var executingGauge = prometheus.NewGauge(prometheus.GaugeOpts{
-	Name: "ifql_control_current_executing",
-	Help: "Number of queries currently executing",
+	Name: "query_control_executing_active",
+	Help: "Number of queries actively executing",
 })
 
 var compilingHist = prometheus.NewHistogram(prometheus.HistogramOpts{
-	Name:    "ifql_control_compiling",
-	Help:    "Histogram of compiling durations",
+	Name:    "query_control_compiling_duration_seconds",
+	Help:    "Histogram of times spent compiling queries",
 	Buckets: prometheus.ExponentialBuckets(1e-3, 5, 7),
 })
 var queueingHist = prometheus.NewHistogram(prometheus.HistogramOpts{
-	Name:    "ifql_control_queueing",
-	Help:    "Histogram of queueing durations",
+	Name:    "query_control_queueing_duration_seconds",
+	Help:    "Histogram of times spent queueing queries",
 	Buckets: prometheus.ExponentialBuckets(1e-3, 5, 7),
 })
 var requeueingHist = prometheus.NewHistogram(prometheus.HistogramOpts{
-	Name:    "ifql_control_requeueing",
-	Help:    "Histogram of requeueing durations",
+	Name:    "query_control_requeueing_duration_seconds",
+	Help:    "Histogram of times spent requeueing queries",
 	Buckets: prometheus.ExponentialBuckets(1e-3, 5, 7),
 })
 var planningHist = prometheus.NewHistogram(prometheus.HistogramOpts{
-	Name:    "ifql_control_planning",
-	Help:    "Histogram of planning durations",
+	Name:    "query_control_planning_duration_seconds",
+	Help:    "Histogram of times spent planning queries",
 	Buckets: prometheus.ExponentialBuckets(1e-5, 5, 7),
 })
 var executingHist = prometheus.NewHistogram(prometheus.HistogramOpts{
-	Name:    "ifql_control_executing",
-	Help:    "Histogram of executing durations",
+	Name:    "query_control_executing_duration_seconds",
+	Help:    "Histogram of times spent executing queries",
 	Buckets: prometheus.ExponentialBuckets(1e-3, 5, 7),
 })
 
