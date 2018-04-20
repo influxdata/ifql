@@ -1,7 +1,6 @@
 package influxql
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/influxdata/ifql/query/plan"
 
 	"bytes"
+	"strings"
 )
 var epoch = time.Unix(0, 0)
 
@@ -34,17 +34,29 @@ func TestExecutor_Execute(t *testing.T) {
 					ColMeta: []execute.ColMeta{
 						execute.TimeCol,
 						execute.ColMeta{
+							Label: "_measurement",
+							Type: execute.TString,
+							Kind: execute.TagColKind,
+							Common: true,
+						},
+						execute.ColMeta{
+							Label: "_field",
+							Type: execute.TString,
+							Kind: execute.TagColKind,
+							Common: true,
+						},
+						execute.ColMeta{
 							Label: execute.DefaultValueColLabel,
 							Type:  execute.TFloat,
 							Kind:  execute.ValueColKind,
 						},
 					},
 					Data: [][]interface{}{
-						{execute.Time(5), 15.0},
+						{execute.Time(5), "cpu", "max", 98.9},
 					},
 				}},
 			},
-			output: ``,
+			output: `{"results":[{"statement_id":0,"series":[{"name":"cpu","columns":["time","max"],"values":[["1970-01-01T00:00:00Z",98.9]]}]}]}`,
 		},
 	}
 
@@ -52,7 +64,7 @@ func TestExecutor_Execute(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 
-			results := map[string]*testResult{}
+			results := map[string]execute.Result{}
 
 			for k,v := range tc.blocks {
 				results[k] = &testResult{v}
@@ -62,8 +74,12 @@ func TestExecutor_Execute(t *testing.T) {
 			var influxQLWriter Writer
 			err := influxQLWriter.WriteTo(&resp, results)
 
-			if !cmp.Equal(got, tc.exp) {
-				t.Error("unexpected results -want/+got", cmp.Diff(tc.exp, got))
+			if err != nil {
+				t.Error("error writing to buffer: ", err)
+			}
+			got := strings.TrimSpace(resp.String())
+			if !cmp.Equal(got, tc.output) {
+				t.Error("unexpected results -want/+got", cmp.Diff(tc.output, got))
 			}
 		})
 	}
@@ -73,24 +89,18 @@ type testResult struct {
 	blocks []*executetest.Block
 }
 
-func (r testResult) Blocks() execute.BlockIterator {
+func (r *testResult) Blocks() execute.BlockIterator {
 	return &storageBlockIterator{
 		storageReader{r.blocks},
 	}
 }
-
-func (r testResult) abort(err error) {}
 
 type storageReader struct {
 	blocks []*executetest.Block
 }
 
 func (s storageReader) Close() {}
-func (s storageReader) Read(context.Context, map[string]string, execute.ReadSpec, execute.Time, execute.Time) (execute.BlockIterator, error) {
-	return &storageBlockIterator{
-		s: s,
-	}, nil
-}
+
 
 type storageBlockIterator struct {
 	s storageReader

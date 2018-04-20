@@ -14,7 +14,7 @@ type Writer struct{}
 
 type response struct {
 	Results []Result `json:"results"`
-	Err     string   `json:"err"`
+	Err     string   `json:"err,omitempty"`
 }
 
 
@@ -40,17 +40,25 @@ func (Writer) WriteTo(w io.Writer, results map[string]execute.Result) error {
 
 		err := blocks.Do(func(b execute.Block) error {
 			var r Row
-
+			fieldName := ""
 			for k, v := range b.Tags() {
 				if k == "_measurement" {
 					r.Name = v
-				} else if k != "_field" {
+				} else if k == "_field" {
+					fieldName = v
+				} else {
 					r.Tags[k] = v
 				}
 			}
 
 			for _, c := range b.Cols() {
-				if !c.Common {
+
+
+				if c.Label == "_time" {
+					r.Columns = append(r.Columns, c.Label[1:])
+				} else if c.Label == "_value" {
+					r.Columns = append(r.Columns, fieldName)
+				} else if !c.Common {
 					r.Columns = append(r.Columns, c.Label)
 				}
 
@@ -76,7 +84,7 @@ func (Writer) WriteTo(w io.Writer, results map[string]execute.Result) error {
 						case execute.TBool:
 							v = append(v, rr.AtBool(i, j))
 						case execute.TTime:
-							v = append(v, rr.AtTime(i, j)/execute.Time(time.Second))
+							v = append(v, rr.AtTime(i, j).Time().Format(time.RFC3339))
 						default:
 							v = append(v, "unknown")
 						}
