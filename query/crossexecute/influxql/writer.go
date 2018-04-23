@@ -56,7 +56,7 @@ func (Writer) WriteTo(w io.Writer, results map[string]execute.Result) error {
 
 				if c.Label == "_time" {
 					r.Columns = append(r.Columns, c.Label[1:])
-				} else if c.Label == "_value" {
+				} else if c.Label == "_value" && fieldName != "" {
 					r.Columns = append(r.Columns, fieldName)
 				} else if !c.Common {
 					r.Columns = append(r.Columns, c.Label)

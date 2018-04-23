@@ -16,7 +16,7 @@ type QueryTranspiler interface {
 
 type ResultWriter interface {
 	WriteTo(w io.Writer, results map[string]execute.Result) error
-	Encode( w io.Writer, result execute.Result)
+	//Encode( w io.Writer, result execute.Result)
 }
 
 type Querier interface {
