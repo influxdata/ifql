@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/ifql/ast"
 	"github.com/influxdata/ifql/functions"
+	"github.com/influxdata/ifql/id"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/execute/executetest"
@@ -18,6 +19,11 @@ import (
 )
 
 var epoch = time.Unix(0, 0)
+var orgID id.ID
+
+func init() {
+	orgID.DecodeFromString("aaaa")
+}
 
 func TestExecutor_Execute(t *testing.T) {
 	testCases := []struct {
@@ -327,9 +333,8 @@ func TestExecutor_Execute(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			c := execute.Config{}
-			exe := execute.NewExecutor(c)
-			results, err := exe.Execute(context.Background(), tc.plan)
+			exe := execute.NewExecutor(nil)
+			results, err := exe.Execute(context.Background(), orgID, tc.plan)
 			if err != nil {
 				t.Fatal(err)
 			}

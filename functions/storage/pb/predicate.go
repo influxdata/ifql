@@ -1,15 +1,14 @@
-package storage
+package pb
 
 import (
 	"fmt"
 
 	"github.com/influxdata/ifql/ast"
-	"github.com/influxdata/ifql/functions/storage/internal/pb"
 	"github.com/influxdata/ifql/semantic"
 	"github.com/pkg/errors"
 )
 
-func ToStoragePredicate(f *semantic.FunctionExpression) (*pb.Predicate, error) {
+func ToStoragePredicate(f *semantic.FunctionExpression) (*Predicate, error) {
 	if len(f.Params) != 1 {
 		return nil, errors.New("storage predicate functions must have exactly one parameter")
 	}
@@ -19,12 +18,12 @@ func ToStoragePredicate(f *semantic.FunctionExpression) (*pb.Predicate, error) {
 		return nil, err
 	}
 
-	return &pb.Predicate{
+	return &Predicate{
 		Root: root,
 	}, nil
 }
 
-func toStoragePredicate(n semantic.Expression, objectName string) (*pb.Node, error) {
+func toStoragePredicate(n semantic.Expression, objectName string) (*Node, error) {
 	switch n := n.(type) {
 	case *semantic.LogicalExpression:
 		left, err := toStoragePredicate(n.Left, objectName)
@@ -35,18 +34,18 @@ func toStoragePredicate(n semantic.Expression, objectName string) (*pb.Node, err
 		if err != nil {
 			return nil, errors.Wrap(err, "right hand side")
 		}
-		children := []*pb.Node{left, right}
+		children := []*Node{left, right}
 		switch n.Operator {
 		case ast.AndOperator:
-			return &pb.Node{
-				NodeType: pb.NodeTypeLogicalExpression,
-				Value:    &pb.Node_Logical_{Logical: pb.LogicalAnd},
+			return &Node{
+				NodeType: NodeTypeLogicalExpression,
+				Value:    &Node_Logical_{Logical: LogicalAnd},
 				Children: children,
 			}, nil
 		case ast.OrOperator:
-			return &pb.Node{
-				NodeType: pb.NodeTypeLogicalExpression,
-				Value:    &pb.Node_Logical_{Logical: pb.LogicalOr},
+			return &Node{
+				NodeType: NodeTypeLogicalExpression,
+				Value:    &Node_Logical_{Logical: LogicalOr},
 				Children: children,
 			}, nil
 		default:
@@ -61,48 +60,48 @@ func toStoragePredicate(n semantic.Expression, objectName string) (*pb.Node, err
 		if err != nil {
 			return nil, errors.Wrap(err, "right hand side")
 		}
-		children := []*pb.Node{left, right}
+		children := []*Node{left, right}
 		op, err := toComparisonOperator(n.Operator)
 		if err != nil {
 			return nil, err
 		}
-		return &pb.Node{
-			NodeType: pb.NodeTypeComparisonExpression,
-			Value:    &pb.Node_Comparison_{Comparison: op},
+		return &Node{
+			NodeType: NodeTypeComparisonExpression,
+			Value:    &Node_Comparison_{Comparison: op},
 			Children: children,
 		}, nil
 	case *semantic.StringLiteral:
-		return &pb.Node{
-			NodeType: pb.NodeTypeLiteral,
-			Value: &pb.Node_StringValue{
+		return &Node{
+			NodeType: NodeTypeLiteral,
+			Value: &Node_StringValue{
 				StringValue: n.Value,
 			},
 		}, nil
 	case *semantic.IntegerLiteral:
-		return &pb.Node{
-			NodeType: pb.NodeTypeLiteral,
-			Value: &pb.Node_IntegerValue{
+		return &Node{
+			NodeType: NodeTypeLiteral,
+			Value: &Node_IntegerValue{
 				IntegerValue: n.Value,
 			},
 		}, nil
 	case *semantic.BooleanLiteral:
-		return &pb.Node{
-			NodeType: pb.NodeTypeLiteral,
-			Value: &pb.Node_BooleanValue{
+		return &Node{
+			NodeType: NodeTypeLiteral,
+			Value: &Node_BooleanValue{
 				BooleanValue: n.Value,
 			},
 		}, nil
 	case *semantic.FloatLiteral:
-		return &pb.Node{
-			NodeType: pb.NodeTypeLiteral,
-			Value: &pb.Node_FloatValue{
+		return &Node{
+			NodeType: NodeTypeLiteral,
+			Value: &Node_FloatValue{
 				FloatValue: n.Value,
 			},
 		}, nil
 	case *semantic.RegexpLiteral:
-		return &pb.Node{
-			NodeType: pb.NodeTypeLiteral,
-			Value: &pb.Node_RegexValue{
+		return &Node{
+			NodeType: NodeTypeLiteral,
+			Value: &Node_RegexValue{
 				RegexValue: n.Value.String(),
 			},
 		}, nil
@@ -112,16 +111,16 @@ func toStoragePredicate(n semantic.Expression, objectName string) (*pb.Node, err
 			return nil, fmt.Errorf("unknown object %q", n.Object)
 		}
 		if n.Property == "_value" {
-			return &pb.Node{
-				NodeType: pb.NodeTypeFieldRef,
-				Value: &pb.Node_FieldRefValue{
+			return &Node{
+				NodeType: NodeTypeFieldRef,
+				Value: &Node_FieldRefValue{
 					FieldRefValue: "_value",
 				},
 			}, nil
 		}
-		return &pb.Node{
-			NodeType: pb.NodeTypeTagRef,
-			Value: &pb.Node_TagRefValue{
+		return &Node{
+			NodeType: NodeTypeTagRef,
+			Value: &Node_TagRefValue{
 				TagRefValue: n.Property,
 			},
 		}, nil
@@ -134,26 +133,26 @@ func toStoragePredicate(n semantic.Expression, objectName string) (*pb.Node, err
 	}
 }
 
-func toComparisonOperator(o ast.OperatorKind) (pb.Node_Comparison, error) {
+func toComparisonOperator(o ast.OperatorKind) (Node_Comparison, error) {
 	switch o {
 	case ast.EqualOperator:
-		return pb.ComparisonEqual, nil
+		return ComparisonEqual, nil
 	case ast.NotEqualOperator:
-		return pb.ComparisonNotEqual, nil
+		return ComparisonNotEqual, nil
 	case ast.RegexpMatchOperator:
-		return pb.ComparisonRegex, nil
+		return ComparisonRegex, nil
 	case ast.NotRegexpMatchOperator:
-		return pb.ComparisonNotRegex, nil
+		return ComparisonNotRegex, nil
 	case ast.StartsWithOperator:
-		return pb.ComparisonStartsWith, nil
+		return ComparisonStartsWith, nil
 	case ast.LessThanOperator:
-		return pb.ComparisonLess, nil
+		return ComparisonLess, nil
 	case ast.LessThanEqualOperator:
-		return pb.ComparisonLessEqual, nil
+		return ComparisonLessEqual, nil
 	case ast.GreaterThanOperator:
-		return pb.ComparisonGreater, nil
+		return ComparisonGreater, nil
 	case ast.GreaterThanEqualOperator:
-		return pb.ComparisonGreaterEqual, nil
+		return ComparisonGreaterEqual, nil
 	default:
 		return 0, fmt.Errorf("unknown operator %v", o)
 	}

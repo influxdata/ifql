@@ -16,6 +16,7 @@ import (
 
 	prompt "github.com/c-bata/go-prompt"
 	"github.com/influxdata/ifql/functions"
+	"github.com/influxdata/ifql/id"
 	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/parser"
 	"github.com/influxdata/ifql/query"
@@ -27,6 +28,8 @@ import (
 )
 
 type REPL struct {
+	orgID id.ID
+
 	scope        *interpreter.Scope
 	declarations semantic.DeclarationScope
 	c            *control.Controller
@@ -51,11 +54,12 @@ func addBuiltIn(script string, scope *interpreter.Scope, declarations semantic.D
 	return nil
 }
 
-func New(c *control.Controller) *REPL {
+func New(c *control.Controller, orgID id.ID) *REPL {
 	scope, declarations := query.BuiltIns()
 	interpScope := interpreter.NewScopeWithValues(scope)
 	addBuiltIn("run = () => yield(table:_)", interpScope, declarations)
 	return &REPL{
+		orgID:        orgID,
 		scope:        interpScope,
 		declarations: declarations,
 		c:            c,
@@ -198,7 +202,7 @@ func (r *REPL) doQuery(spec *query.Spec) error {
 	defer cancelFunc()
 	defer r.clearCancel()
 
-	q, err := r.c.Query(ctx, spec)
+	q, err := r.c.Query(ctx, r.orgID, spec)
 	if err != nil {
 		return err
 	}

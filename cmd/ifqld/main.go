@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/influxdata/ifql"
+	"github.com/influxdata/ifql/functions"
+	"github.com/influxdata/ifql/functions/storage"
+	"github.com/influxdata/ifql/functions/storage/pb"
+	"github.com/influxdata/ifql/id"
 	"github.com/influxdata/ifql/idfile"
 	"github.com/influxdata/ifql/query"
-	"github.com/influxdata/ifql/query/crossexecute"
-	"github.com/influxdata/ifql/query/crossexecute/influxql"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/tracing"
 	"github.com/influxdata/influxdb/models"
@@ -42,6 +44,14 @@ type options struct {
 	Verbose           bool           `short:"v" long:"verbose" description:"Log more verbose debugging output"`
 	ConcurrencyQuota  int            `short:"c" long:"concurrency-quota" description:"Maximum concurrency allowed" env:"CONCURRENCY_QUOTA"`
 	MemoryBytesQuota  int            `short:"m" long:"memory-quota" description:"Approximate maximum memory usage allowed in bytes" env:"MEMORY_BYTES_QUOTA"`
+}
+
+var (
+	orgID id.ID
+)
+
+func init() {
+	orgID.DecodeFromString("bbbb")
 }
 
 var opts = options{
@@ -81,11 +91,17 @@ func main() {
 		}
 		os.Exit(code)
 	}
-	c, err := ifql.NewController(ifql.Config{
-		Hosts:            opts.Hosts,
+	config := ifql.Config{
+		Dependencies:     make(execute.Dependencies),
 		ConcurrencyQuota: opts.ConcurrencyQuota,
 		MemoryBytesQuota: opts.MemoryBytesQuota,
-	})
+	}
+
+	if err := injectDeps(config.Dependencies); err != nil {
+		log.Fatal(err)
+	}
+
+	c, err := ifql.NewController(config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -93,7 +109,6 @@ func main() {
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/query", http.HandlerFunc(HandleQuery))
-	http.Handle("/influxql/query", http.HandlerFunc(HandleInfluxQLQuery))
 	http.Handle("/queries", http.HandlerFunc(HandleQueries))
 
 	if !opts.ReportingDisabled {
@@ -109,27 +124,15 @@ func main() {
 	log.Fatal(http.ListenAndServe(opts.Addr, nil))
 }
 
-// TODO (pauldix): pull all this out into a server object that can
-//                 be tested. Alas, demo day waits for no person.
-
-// HandleInfluxQLQuery transpiles and executes the InfluxQL query.
-func HandleInfluxQLQuery(w http.ResponseWriter, req *http.Request) {
-	queryStr := req.FormValue("q")
-	if queryStr == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("must pass query in q parameter"))
-		return
-	}
-	if opts.Verbose {
-		log.Print(queryStr)
-	}
-
-	err := crossexecute.CrossExecute(req.Context(), queryStr, controller, new(influxql.Transpiler), influxql.Writer{}, w)
+func injectDeps(deps execute.Dependencies) error {
+	sr, err := pb.NewReader(storage.NewStaticLookup(opts.Hosts))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
-		return
+		return err
 	}
+
+	return functions.InjectFromDependencies(deps, storage.Dependencies{
+		Reader: sr,
+	})
 }
 
 // HandleQuery interprets and executes ifql syntax and returns results
@@ -153,7 +156,7 @@ func HandleQuery(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		q, err = controller.Query(ctx, spec)
+		q, err = controller.Query(ctx, orgID, spec)
 	} else {
 		queryStr := req.FormValue("q")
 		if queryStr == "" {
@@ -177,7 +180,7 @@ func HandleQuery(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		q, err = controller.QueryWithCompile(ctx, queryStr)
+		q, err = controller.QueryWithCompile(ctx, orgID, queryStr)
 	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

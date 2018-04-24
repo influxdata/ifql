@@ -11,7 +11,6 @@ import (
 
 	"github.com/influxdata/ifql/complete"
 	_ "github.com/influxdata/ifql/functions"
-	"github.com/influxdata/ifql/functions/storage"
 	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
 
@@ -24,7 +23,7 @@ func init() {
 }
 
 type Config struct {
-	Hosts []string
+	Dependencies execute.Dependencies
 
 	ConcurrencyQuota int
 	MemoryBytesQuota int
@@ -43,14 +42,10 @@ type Query = control.Query
 
 func NewController(conf Config) (*Controller, error) {
 	c := control.Config{
-		ConcurrencyQuota: conf.ConcurrencyQuota,
-		MemoryBytesQuota: int64(conf.MemoryBytesQuota),
-		ExecutorConfig: execute.Config{
-			"storage": storage.Config{
-				HostLookup: storage.NewStaticLookup(conf.Hosts),
-			},
-		},
-		Verbose: conf.Verbose,
+		ConcurrencyQuota:     conf.ConcurrencyQuota,
+		MemoryBytesQuota:     int64(conf.MemoryBytesQuota),
+		ExecutorDependencies: conf.Dependencies,
+		Verbose:              conf.Verbose,
 	}
 	return control.New(c), nil
 }
