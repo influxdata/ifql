@@ -2,11 +2,14 @@ package functions
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/semantic"
+	"github.com/influxdata/ifql/values"
+	"github.com/pkg/errors"
 )
 
 const WindowKind = "window"
@@ -19,6 +22,8 @@ type WindowOpSpec struct {
 	Triggering query.TriggerSpec `json:"triggering"`
 }
 
+var infinityVar = values.NewDurationValue(math.MaxInt64)
+
 var windowSignature = query.DefaultFunctionSignature()
 
 func init() {
@@ -29,6 +34,7 @@ func init() {
 
 	query.RegisterFunction(WindowKind, createWindowOpSpec, windowSignature)
 	query.RegisterOpSpec(WindowKind, newWindowOp)
+	query.RegisterBuiltInValue("inf", infinityVar)
 	plan.RegisterProcedureSpec(WindowKind, newWindowProcedure, WindowKind)
 	execute.RegisterTransformation(WindowKind, createWindowTransformation)
 }
@@ -64,9 +70,9 @@ func createWindowOpSpec(args query.Arguments, a *query.Administration) (query.Op
 		spec.Start = start
 	}
 
-	//if !everySet && !periodSet {
-	//	return nil, errors.New(`window function requires at least one of "every" or "period" to be set`)
-	//}
+	if !everySet && !periodSet {
+		return nil, errors.New(`window function requires at least one of "every" or "period" to be set`)
+	}
 
 	// Apply defaults
 	if !everySet {
@@ -213,9 +219,6 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 }
 
 func (t *fixedWindowTransformation) getWindowBounds(now execute.Time) []execute.Bounds {
-	if t.w.Every == 0 && t.w.Period == 0 {
-		return []execute.Bounds{t.bounds}
-	}
 	stop := now.Truncate(t.w.Every) + execute.Time(t.offset)
 	if now >= stop {
 		stop += execute.Time(t.w.Every)
