@@ -1,0 +1,66 @@
+# helpers that have emerged from several efforts by several people
+
+
+// potential builtins
+fromRange = (forDB, start, end=now()) => from(db:forDB) |> range(start:start, end: end)
+
+
+// Quickly get fields, measurements
+field = (f, table=<-) => filter(table:table, fn: (r) => r._field == f)
+measurement = (m, table=<-) => filter(table:table, fn: (r) => r._measurement == m)
+select = (measurement, field, table=<-) => projectMeasurement(m:measurement, table:table) |> projectField(f:field)
+
+
+
+// WANT: selecting by specific tag values.  This is similar to group(by:TAGS) but then we drop all the groups but one
+withTags = (table=<-, tagsvalues={}) =>
+                    table
+                       |> // need a filterForEach that will iterate over   tag:value pairs so that we get a set
+                          // of tuples where all have the same tags+values on all tag columns.
+
+
+
+
+
+
+//  Summarize helpers
+summarizeGroup = (table=<-, aggFn, measurement, field, groupby=["host"]) =>
+                     table
+                       |> select(measurement: measurement, field: field)
+                       |> group(by: groupby)
+                       |> aggFn()
+                       |> group()
+
+summarizeWindow = (table=<-, aggFn, measurement, field, every, period) =>
+                     table
+                       |> select(measurement: measurement, field: field)
+                       |> window(every:every, period: period)
+                       |> aggFn()
+                       |> window()
+
+
+summarize = (table=<-, aggFn, measurement, field, every, period) =>
+                     table
+                       |> select(measurement: measurement, field: field)
+                       |> window(every:every, period: period)
+                       |> aggFn()
+                       |> window()
+
+// a shortcut that will at least be useful internally if not for the end user
+oneblock = (table=<-) =>
+                table
+                  |> window()
+                  |> group()
+
+
+
+// join helpers
+joinkeys = (t1,t2,keys) => join(tables: {t1:t1, t2:t2}, on:keys, fn: (tables) => {val1:t1._value, val2:t2._value})
+jointime = (t1,t2) => joinkeys(t1,t2,[])
+// WANT (maybe?)
+joinFields = (table=<-, measurement, tags, fields) =>
+                table
+                  |> measurement(name: measurement)
+                  |> withTags(tags:tags)
+                  |> // here we'll have many blocks all with the same tags but different fields.  Now we need to join
+                     // those blocks together horizontally
