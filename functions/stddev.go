@@ -74,7 +74,7 @@ func createStddevTransformation(id execute.DatasetID, mode execute.AccumulationM
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid spec type %T", spec)
 	}
-	t, d := execute.NewAggregateTransformationAndDataset(id, mode, a.Bounds(), new(StddevAgg), s.AggregateConfig, a.Allocator())
+	t, d := execute.NewAggregateTransformationAndDataset(id, mode, new(StddevAgg), s.AggregateConfig, a.Allocator())
 	return t, d, nil
 }
 

@@ -16,19 +16,14 @@ func TestAggregate_Process(t *testing.T) {
 	countAgg := new(functions.CountAgg)
 	testCases := []struct {
 		name   string
-		bounds execute.Bounds
 		agg    execute.Aggregate
 		config execute.AggregateConfig
 		data   []*executetest.Block
-		want   func(b execute.Bounds) []*executetest.Block
+		want   []*executetest.Block
 	}{
 		{
 			name: "single",
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
-			},
-			agg: sumAgg,
+			agg:  sumAgg,
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
 					Start: 0,
@@ -51,28 +46,25 @@ func TestAggregate_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(100), 45.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(100), 45.0},
+				},
+			}},
 		},
 		{
 			name: "single use start time",
 			config: execute.AggregateConfig{
 				UseStartTime: true,
 			},
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
-			},
 			agg: sumAgg,
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
@@ -96,26 +88,23 @@ func TestAggregate_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(0), 45.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(0), 45.0},
+				},
+			}},
 		},
 		{
 			name: "multiple blocks",
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  200,
-			},
-			agg: sumAgg,
+			agg:  sumAgg,
 			data: []*executetest.Block{
 				{
 					Bnds: execute.Bounds{
@@ -162,27 +151,38 @@ func TestAggregate_Process(t *testing.T) {
 					},
 				},
 			},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
+			want: []*executetest.Block{
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
+					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
 					},
 					Data: [][]interface{}{
 						{execute.Time(100), 45.0},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					},
+					Data: [][]interface{}{
 						{execute.Time(200), 145.0},
 					},
-				}}
+				},
 			},
 		},
 		{
 			name: "multiple blocks with tags",
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  200,
-			},
-			agg: sumAgg,
+			agg:  sumAgg,
 			data: []*executetest.Block{
 				{
 					Bnds: execute.Bounds{
@@ -277,42 +277,68 @@ func TestAggregate_Process(t *testing.T) {
 					},
 				},
 			},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{
-					{
-						Bnds: b,
-						ColMeta: []execute.ColMeta{
-							{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-							{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-							{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						},
-						Data: [][]interface{}{
-							{execute.Time(100), 45.0, "a"},
-							{execute.Time(200), 145.0, "a"},
-						},
+			want: []*executetest.Block{
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
 					},
-					{
-						Bnds: b,
-						ColMeta: []execute.ColMeta{
-							{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-							{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-							{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						},
-						Data: [][]interface{}{
-							{execute.Time(100), 48.0, "b"},
-							{execute.Time(200), 148.0, "b"},
-						},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
 					},
-				}
+					Data: [][]interface{}{
+						{execute.Time(100), 45.0, "a"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+					},
+					Data: [][]interface{}{
+						{execute.Time(200), 145.0, "a"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+					},
+					Data: [][]interface{}{
+						{execute.Time(100), 48.0, "b"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+					},
+					Data: [][]interface{}{
+						{execute.Time(200), 148.0, "b"},
+					},
+				},
 			},
 		},
 		{
 			name: "multiple values",
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
-			},
-			agg: sumAgg,
+			agg:  sumAgg,
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
 					Start: 0,
@@ -336,27 +362,24 @@ func TestAggregate_Process(t *testing.T) {
 					{execute.Time(90), 9.0, -9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(100), 45.0, -45.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(100), 45.0, -45.0},
+				},
+			}},
 		},
 		{
 			name: "multiple values changing types",
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
-			},
-			agg: countAgg,
+			agg:  countAgg,
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
 					Start: 0,
@@ -380,19 +403,20 @@ func TestAggregate_Process(t *testing.T) {
 					{execute.Time(90), 9.0, -9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "x", Type: execute.TInt, Kind: execute.ValueColKind},
-						{Label: "y", Type: execute.TInt, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(100), int64(10), int64(10)},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "x", Type: execute.TInt, Kind: execute.ValueColKind},
+					{Label: "y", Type: execute.TInt, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(100), int64(10), int64(10)},
+				},
+			}},
 		},
 	}
 	for _, tc := range testCases {
@@ -402,7 +426,7 @@ func TestAggregate_Process(t *testing.T) {
 			c := execute.NewBlockBuilderCache(executetest.UnlimitedAllocator)
 			c.SetTriggerSpec(execute.DefaultTriggerSpec)
 
-			agg := execute.NewAggregateTransformation(d, c, tc.bounds, tc.agg, tc.config)
+			agg := execute.NewAggregateTransformation(d, c, tc.agg, tc.config)
 
 			parentID := executetest.RandomDatasetID()
 			for _, b := range tc.data {
@@ -411,14 +435,13 @@ func TestAggregate_Process(t *testing.T) {
 				}
 			}
 
-			want := tc.want(tc.bounds)
 			got := executetest.BlocksFromCache(c)
 
 			sort.Sort(executetest.SortedBlocks(got))
-			sort.Sort(executetest.SortedBlocks(want))
+			sort.Sort(executetest.SortedBlocks(tc.want))
 
-			if !cmp.Equal(want, got, cmpopts.EquateNaNs()) {
-				t.Errorf("unexpected blocks -want/+got\n%s", cmp.Diff(want, got))
+			if !cmp.Equal(tc.want, got, cmpopts.EquateNaNs()) {
+				t.Errorf("unexpected blocks -want/+got\n%s", cmp.Diff(tc.want, got))
 			}
 		})
 	}

@@ -15,17 +15,12 @@ func TestRowSelector_Process(t *testing.T) {
 	// All test cases use a simple MinSelector
 	testCases := []struct {
 		name           string
-		bounds         execute.Bounds
 		selectorConfig execute.SelectorConfig
 		data           []*executetest.Block
-		want           func(b execute.Bounds) []*executetest.Block
+		want           []*executetest.Block
 	}{
 		{
 			name: "single",
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
-			},
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
 					Start: 0,
@@ -48,28 +43,25 @@ func TestRowSelector_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(100), 0.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(100), 0.0},
+				},
+			}},
 		},
 		{
 			name: "single useStartTime",
 			selectorConfig: execute.SelectorConfig{
 				UseStartTime: true,
 			},
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
-			},
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
 					Start: 0,
@@ -92,28 +84,25 @@ func TestRowSelector_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(0), 0.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(0), 0.0},
+				},
+			}},
 		},
 		{
 			name: "single useRowTime",
 			selectorConfig: execute.SelectorConfig{
 				UseRowTime: true,
 			},
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
-			},
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
 					Start: 0,
@@ -136,27 +125,24 @@ func TestRowSelector_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(0), 0.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(0), 0.0},
+				},
+			}},
 		},
 		{
 			name: "single custom column",
 			selectorConfig: execute.SelectorConfig{
 				Column: "x",
-			},
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  100,
 			},
 			data: []*executetest.Block{{
 				Bnds: execute.Bounds{
@@ -180,25 +166,22 @@ func TestRowSelector_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(100), 0.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(100), 0.0},
+				},
+			}},
 		},
 		{
 			name: "multiple blocks",
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  200,
-			},
 			data: []*executetest.Block{
 				{
 					Bnds: execute.Bounds{
@@ -245,28 +228,39 @@ func TestRowSelector_Process(t *testing.T) {
 					},
 				},
 			},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
+			want: []*executetest.Block{
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
+					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
 					},
 					Data: [][]interface{}{
 						{execute.Time(100), 0.0},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					},
+					Data: [][]interface{}{
 						{execute.Time(200), 10.0},
 					},
-				}}
+				},
 			},
 		},
 		{
 			name: "multiple blocks with tags and useRowTime",
 			selectorConfig: execute.SelectorConfig{
 				UseRowTime: true,
-			},
-			bounds: execute.Bounds{
-				Start: 0,
-				Stop:  200,
 			},
 			data: []*executetest.Block{
 				{
@@ -366,35 +360,67 @@ func TestRowSelector_Process(t *testing.T) {
 					},
 				},
 			},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{
-					{
-						Bnds: b,
-						ColMeta: []execute.ColMeta{
-							{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-							{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-							{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-							{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						},
-						Data: [][]interface{}{
-							{execute.Time(40), 1.0, "a", "x"},
-							{execute.Time(160), 11.0, "a", "y"},
-						},
+			want: []*executetest.Block{
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
 					},
-					{
-						Bnds: b,
-						ColMeta: []execute.ColMeta{
-							{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-							{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-							{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-							{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						},
-						Data: [][]interface{}{
-							{execute.Time(90), 1.3, "b", "y"},
-							{execute.Time(110), 11.3, "b", "x"},
-						},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
 					},
-				}
+					Data: [][]interface{}{
+						{execute.Time(40), 1.0, "a", "x"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					},
+					Data: [][]interface{}{
+						{execute.Time(160), 11.0, "a", "y"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					},
+					Data: [][]interface{}{
+						{execute.Time(90), 1.3, "b", "y"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					},
+					Data: [][]interface{}{
+						{execute.Time(110), 11.3, "b", "x"},
+					},
+				},
 			},
 		},
 	}
@@ -405,7 +431,7 @@ func TestRowSelector_Process(t *testing.T) {
 			c := execute.NewBlockBuilderCache(executetest.UnlimitedAllocator)
 			c.SetTriggerSpec(execute.DefaultTriggerSpec)
 
-			selector := execute.NewRowSelectorTransformation(d, c, tc.bounds, new(functions.MinSelector), tc.selectorConfig)
+			selector := execute.NewRowSelectorTransformation(d, c, new(functions.MinSelector), tc.selectorConfig)
 
 			parentID := executetest.RandomDatasetID()
 			for _, b := range tc.data {
@@ -414,14 +440,13 @@ func TestRowSelector_Process(t *testing.T) {
 				}
 			}
 
-			want := tc.want(tc.bounds)
 			got := executetest.BlocksFromCache(c)
 
 			sort.Sort(executetest.SortedBlocks(got))
-			sort.Sort(executetest.SortedBlocks(want))
+			sort.Sort(executetest.SortedBlocks(tc.want))
 
-			if !cmp.Equal(want, got, cmpopts.EquateNaNs()) {
-				t.Errorf("unexpected blocks -want/+got\n%s", cmp.Diff(want, got))
+			if !cmp.Equal(tc.want, got, cmpopts.EquateNaNs()) {
+				t.Errorf("unexpected blocks -want/+got\n%s", cmp.Diff(tc.want, got))
 			}
 		})
 	}
@@ -434,7 +459,7 @@ func TestIndexSelector_Process(t *testing.T) {
 		bounds         execute.Bounds
 		selectorConfig execute.SelectorConfig
 		data           []*executetest.Block
-		want           func(b execute.Bounds) []*executetest.Block
+		want           []*executetest.Block
 	}{
 		{
 			name: "single",
@@ -464,18 +489,19 @@ func TestIndexSelector_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(100), 0.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(100), 0.0},
+				},
+			}},
 		},
 		{
 			name: "single useStartTime",
@@ -508,18 +534,19 @@ func TestIndexSelector_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(0), 0.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(0), 0.0},
+				},
+			}},
 		},
 		{
 			name: "single useRowTime",
@@ -552,18 +579,19 @@ func TestIndexSelector_Process(t *testing.T) {
 					{execute.Time(90), 9.0},
 				},
 			}},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
-					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					},
-					Data: [][]interface{}{
-						{execute.Time(0), 0.0},
-					},
-				}}
-			},
+			want: []*executetest.Block{{
+				Bnds: execute.Bounds{
+					Start: 0,
+					Stop:  100,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+				},
+				Data: [][]interface{}{
+					{execute.Time(0), 0.0},
+				},
+			}},
 		},
 		{
 			name: "multiple blocks",
@@ -617,18 +645,33 @@ func TestIndexSelector_Process(t *testing.T) {
 					},
 				},
 			},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{{
-					Bnds: b,
+			want: []*executetest.Block{
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
+					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
 					},
 					Data: [][]interface{}{
 						{execute.Time(100), 0.0},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					},
+					Data: [][]interface{}{
 						{execute.Time(200), 10.0},
 					},
-				}}
+				},
 			},
 		},
 		{
@@ -738,35 +781,67 @@ func TestIndexSelector_Process(t *testing.T) {
 					},
 				},
 			},
-			want: func(b execute.Bounds) []*executetest.Block {
-				return []*executetest.Block{
-					{
-						Bnds: b,
-						ColMeta: []execute.ColMeta{
-							{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-							{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-							{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-							{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						},
-						Data: [][]interface{}{
-							{execute.Time(0), 4.0, "a", "x"},
-							{execute.Time(100), 14.0, "a", "y"},
-						},
+			want: []*executetest.Block{
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
 					},
-					{
-						Bnds: b,
-						ColMeta: []execute.ColMeta{
-							{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-							{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-							{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-							{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						},
-						Data: [][]interface{}{
-							{execute.Time(0), 3.3, "b", "x"},
-							{execute.Time(100), 12.3, "b", "y"},
-						},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
 					},
-				}
+					Data: [][]interface{}{
+						{execute.Time(0), 4.0, "a", "x"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					},
+					Data: [][]interface{}{
+						{execute.Time(100), 14.0, "a", "y"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 0,
+						Stop:  100,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					},
+					Data: [][]interface{}{
+						{execute.Time(0), 3.3, "b", "x"},
+					},
+				},
+				{
+					Bnds: execute.Bounds{
+						Start: 100,
+						Stop:  200,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
+						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					},
+					Data: [][]interface{}{
+						{execute.Time(100), 12.3, "b", "y"},
+					},
+				},
 			},
 		},
 	}
@@ -777,7 +852,7 @@ func TestIndexSelector_Process(t *testing.T) {
 			c := execute.NewBlockBuilderCache(executetest.UnlimitedAllocator)
 			c.SetTriggerSpec(execute.DefaultTriggerSpec)
 
-			selector := execute.NewIndexSelectorTransformation(d, c, tc.bounds, new(functions.FirstSelector), tc.selectorConfig)
+			selector := execute.NewIndexSelectorTransformation(d, c, new(functions.FirstSelector), tc.selectorConfig)
 
 			parentID := executetest.RandomDatasetID()
 			for _, b := range tc.data {
@@ -786,14 +861,13 @@ func TestIndexSelector_Process(t *testing.T) {
 				}
 			}
 
-			want := tc.want(tc.bounds)
 			got := executetest.BlocksFromCache(c)
 
 			sort.Sort(executetest.SortedBlocks(got))
-			sort.Sort(executetest.SortedBlocks(want))
+			sort.Sort(executetest.SortedBlocks(tc.want))
 
-			if !cmp.Equal(want, got, cmpopts.EquateNaNs()) {
-				t.Errorf("unexpected blocks -want/+got\n%s", cmp.Diff(want, got))
+			if !cmp.Equal(tc.want, got, cmpopts.EquateNaNs()) {
+				t.Errorf("unexpected blocks -want/+got\n%s", cmp.Diff(tc.want, got))
 			}
 		})
 	}

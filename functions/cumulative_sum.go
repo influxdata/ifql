@@ -101,13 +101,13 @@ func (t *cumulativeSumTransformation) Process(id execute.DatasetID, b execute.Bl
 				case execute.ValueColKind:
 					switch c.Type {
 					case execute.TInt:
-						cumSum := cumulativeSums[j].addInt(rr.AtInt(i,j))
+						cumSum := cumulativeSums[j].addInt(rr.AtInt(i, j))
 						builder.AppendInt(j, cumSum)
 					case execute.TUInt:
-						cumSum := cumulativeSums[j].addUInt(rr.AtUInt(i,j))
+						cumSum := cumulativeSums[j].addUInt(rr.AtUInt(i, j))
 						builder.AppendUInt(j, cumSum)
 					case execute.TFloat:
-						cumSum := cumulativeSums[j].addFloat(rr.AtFloat(i,j))
+						cumSum := cumulativeSums[j].addFloat(rr.AtFloat(i, j))
 						builder.AppendFloat(j, cumSum)
 					case execute.TBool:
 						builder.AppendBool(j, rr.AtBool(i, j))
@@ -134,8 +134,8 @@ func (t *cumulativeSumTransformation) Finish(id execute.DatasetID, err error) {
 }
 
 type cumulativeSum struct {
-	intVal	 int64
-	uintVal	 uint64
+	intVal   int64
+	uintVal  uint64
 	floatVal float64
 }
 

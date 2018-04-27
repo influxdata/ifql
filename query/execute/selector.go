@@ -8,9 +8,8 @@ import (
 )
 
 type selectorTransformation struct {
-	d      Dataset
-	cache  BlockBuilderCache
-	bounds Bounds
+	d     Dataset
+	cache BlockBuilderCache
 
 	config SelectorConfig
 }
@@ -52,38 +51,37 @@ type indexSelectorTransformation struct {
 	selector IndexSelector
 }
 
-func NewRowSelectorTransformationAndDataset(id DatasetID, mode AccumulationMode, bounds Bounds, selector RowSelector, config SelectorConfig, a *Allocator) (*rowSelectorTransformation, Dataset) {
+func NewRowSelectorTransformationAndDataset(id DatasetID, mode AccumulationMode, selector RowSelector, config SelectorConfig, a *Allocator) (*rowSelectorTransformation, Dataset) {
 	cache := NewBlockBuilderCache(a)
 	d := NewDataset(id, mode, cache)
-	return NewRowSelectorTransformation(d, cache, bounds, selector, config), d
+	return NewRowSelectorTransformation(d, cache, selector, config), d
 }
-func NewRowSelectorTransformation(d Dataset, c BlockBuilderCache, bounds Bounds, selector RowSelector, config SelectorConfig) *rowSelectorTransformation {
+func NewRowSelectorTransformation(d Dataset, c BlockBuilderCache, selector RowSelector, config SelectorConfig) *rowSelectorTransformation {
 	return &rowSelectorTransformation{
-		selectorTransformation: newSelectorTransformation(d, c, bounds, config),
+		selectorTransformation: newSelectorTransformation(d, c, config),
 		selector:               selector,
 	}
 }
 
-func NewIndexSelectorTransformationAndDataset(id DatasetID, mode AccumulationMode, bounds Bounds, selector IndexSelector, config SelectorConfig, a *Allocator) (*indexSelectorTransformation, Dataset) {
+func NewIndexSelectorTransformationAndDataset(id DatasetID, mode AccumulationMode, selector IndexSelector, config SelectorConfig, a *Allocator) (*indexSelectorTransformation, Dataset) {
 	cache := NewBlockBuilderCache(a)
 	d := NewDataset(id, mode, cache)
-	return NewIndexSelectorTransformation(d, cache, bounds, selector, config), d
+	return NewIndexSelectorTransformation(d, cache, selector, config), d
 }
-func NewIndexSelectorTransformation(d Dataset, c BlockBuilderCache, bounds Bounds, selector IndexSelector, config SelectorConfig) *indexSelectorTransformation {
+func NewIndexSelectorTransformation(d Dataset, c BlockBuilderCache, selector IndexSelector, config SelectorConfig) *indexSelectorTransformation {
 	return &indexSelectorTransformation{
-		selectorTransformation: newSelectorTransformation(d, c, bounds, config),
+		selectorTransformation: newSelectorTransformation(d, c, config),
 		selector:               selector,
 	}
 }
 
-func newSelectorTransformation(d Dataset, c BlockBuilderCache, bounds Bounds, config SelectorConfig) selectorTransformation {
+func newSelectorTransformation(d Dataset, c BlockBuilderCache, config SelectorConfig) selectorTransformation {
 	if config.Column == "" {
 		config.Column = DefaultValueColLabel
 	}
 	return selectorTransformation{
 		d:      d,
 		cache:  c,
-		bounds: bounds,
 		config: config,
 	}
 }
@@ -104,10 +102,7 @@ func (t *selectorTransformation) Finish(id DatasetID, err error) {
 }
 
 func (t *selectorTransformation) setupBuilder(b Block) (BlockBuilder, int) {
-	builder, new := t.cache.BlockBuilder(blockMetadata{
-		bounds: t.bounds,
-		tags:   b.Tags(),
-	})
+	builder, new := t.cache.BlockBuilder(b)
 	if new {
 		AddBlockCols(b, builder)
 	}
