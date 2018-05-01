@@ -15,3 +15,9 @@ required = ["github.com/mna/pigeon", "github.com/goreleaser/goreleaser"]
 [[constraint]]
   name = "github.com/uber/jaeger-client-go"
   version = "2.10.0"
+
+# Prometheus are currently pre v1.0, so the API is changing considerably.
+# The latest release (0.8) predates exported API requirements.
+[[constraint]]
+  name = "github.com/prometheus/client_golang"
+  revision = "661e31bf844dfca9aeba15f27ea8aa0d485ad212"

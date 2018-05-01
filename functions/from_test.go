@@ -12,8 +12,13 @@ import (
 func TestFrom_NewQuery(t *testing.T) {
 	tests := []querytest.NewQueryTestCase{
 		{
-			Name:    "from",
+			Name:    "from no args",
 			Raw:     `from()`,
+			WantErr: true,
+		},
+		{
+			Name:    "from conflicting args",
+			Raw:     `from(db:"d", bucket:"b")`,
 			WantErr: true,
 		},
 		{

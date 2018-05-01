@@ -3,6 +3,7 @@ package execute
 import (
 	"fmt"
 
+	"github.com/influxdata/ifql/id"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/plan"
 )
@@ -16,14 +17,20 @@ type Transformation interface {
 }
 
 type Administration interface {
+	OrganizationID() id.ID
+
 	ResolveTime(qt query.Time) Time
 	Bounds() Bounds
 	Allocator() *Allocator
 	Parents() []DatasetID
 	ConvertID(plan.ProcedureID) DatasetID
 
-	Config() Config
+	Dependencies() Dependencies
 }
+
+// Dependencies represents the provided dependencies to the execution environment.
+// The dependencies is opaque.
+type Dependencies map[string]interface{}
 
 type CreateTransformation func(id DatasetID, mode AccumulationMode, spec plan.ProcedureSpec, a Administration) (Transformation, Dataset, error)
 

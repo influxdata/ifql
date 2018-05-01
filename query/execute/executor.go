@@ -5,29 +5,32 @@ import (
 	"fmt"
 	"runtime/debug"
 
+	"github.com/influxdata/ifql/id"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/pkg/errors"
 )
 
 type Executor interface {
-	Execute(context.Context, *plan.PlanSpec) (map[string]Result, error)
+	Execute(ctx context.Context, orgID id.ID, p *plan.PlanSpec) (map[string]Result, error)
 }
 
 type executor struct {
-	c Config
+	deps Dependencies
 }
 
-func NewExecutor(c Config) Executor {
+func NewExecutor(deps Dependencies) Executor {
 	e := &executor{
-		c: c,
+		deps: deps,
 	}
 	return e
 }
 
 type executionState struct {
-	p *plan.PlanSpec
-	c Config
+	p    *plan.PlanSpec
+	deps Dependencies
+
+	orgID id.ID
 
 	alloc *Allocator
 
@@ -43,8 +46,8 @@ type executionState struct {
 	dispatcher *poolDispatcher
 }
 
-func (e *executor) Execute(ctx context.Context, p *plan.PlanSpec) (map[string]Result, error) {
-	es, err := e.createExecutionState(ctx, p)
+func (e *executor) Execute(ctx context.Context, orgID id.ID, p *plan.PlanSpec) (map[string]Result, error) {
+	es, err := e.createExecutionState(ctx, orgID, p)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to initialize execute state")
 	}
@@ -59,13 +62,14 @@ func validatePlan(p *plan.PlanSpec) error {
 	return nil
 }
 
-func (e *executor) createExecutionState(ctx context.Context, p *plan.PlanSpec) (*executionState, error) {
+func (e *executor) createExecutionState(ctx context.Context, orgID id.ID, p *plan.PlanSpec) (*executionState, error) {
 	if err := validatePlan(p); err != nil {
 		return nil, errors.Wrap(err, "invalid plan")
 	}
 	es := &executionState{
-		p: p,
-		c: e.c,
+		orgID: orgID,
+		p:     p,
+		deps:  e.deps,
 		alloc: &Allocator{
 			Limit: p.Resources.MemoryBytesQuota,
 		},
@@ -206,6 +210,9 @@ type executionContext struct {
 }
 
 // Satisfy the ExecutionContext interface
+func (ec executionContext) OrganizationID() id.ID {
+	return ec.es.orgID
+}
 
 func (ec executionContext) ResolveTime(qt query.Time) Time {
 	return Time(qt.Time(ec.es.p.Now).UnixNano())
@@ -225,6 +232,6 @@ func (ec executionContext) ConvertID(id plan.ProcedureID) DatasetID {
 	return DatasetID(id)
 }
 
-func (ec executionContext) Config() Config {
-	return ec.es.c
+func (ec executionContext) Dependencies() Dependencies {
+	return ec.es.deps
 }

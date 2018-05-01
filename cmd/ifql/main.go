@@ -9,6 +9,11 @@ import (
 	"runtime"
 
 	"github.com/influxdata/ifql"
+	"github.com/influxdata/ifql/functions"
+	"github.com/influxdata/ifql/functions/storage"
+	"github.com/influxdata/ifql/functions/storage/pb"
+	"github.com/influxdata/ifql/id"
+	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/repl"
 )
 
@@ -33,6 +38,14 @@ func (l *hostList) Set(s string) error {
 
 var defaultStorageHosts = []string{"localhost:8082"}
 
+var (
+	orgID id.ID
+)
+
+func init() {
+	orgID.DecodeFromString("bbbb")
+}
+
 func usage() {
 	fmt.Println("Usage: ifql [OPTIONS] [query]")
 	fmt.Println()
@@ -55,16 +68,22 @@ func main() {
 		hosts = defaultStorageHosts
 	}
 
-	c, err := ifql.NewController(ifql.Config{
-		Hosts:            hosts,
+	config := ifql.Config{
+		Dependencies:     make(execute.Dependencies),
 		ConcurrencyQuota: runtime.NumCPU() * 2,
 		MemoryBytesQuota: math.MaxInt64,
 		Verbose:          *verbose,
-	})
+	}
+
+	if err := injectDeps(config.Dependencies, hosts); err != nil {
+		log.Fatal(err)
+	}
+
+	c, err := ifql.NewController(config)
 	if err != nil {
 		log.Fatal(err)
 	}
-	replCmd := repl.New(c)
+	replCmd := repl.New(c, orgID)
 
 	args := flag.Args()
 	switch len(args) {
@@ -83,4 +102,14 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
+}
+func injectDeps(deps execute.Dependencies, hosts []string) error {
+	sr, err := pb.NewReader(storage.NewStaticLookup(hosts))
+	if err != nil {
+		return err
+	}
+
+	return functions.InjectFromDependencies(deps, storage.Dependencies{
+		Reader: sr,
+	})
 }

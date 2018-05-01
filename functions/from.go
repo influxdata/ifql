@@ -4,17 +4,20 @@ import (
 	"fmt"
 
 	"github.com/influxdata/ifql/functions/storage"
+	"github.com/influxdata/ifql/id"
 	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/semantic"
+	"github.com/pkg/errors"
 )
 
 const FromKind = "from"
 
 type FromOpSpec struct {
 	Database string   `json:"database"`
+	Bucket   string   `json:"bucket"`
 	Hosts    []string `json:"hosts"`
 }
 
@@ -33,12 +36,25 @@ func init() {
 }
 
 func createFromOpSpec(args query.Arguments, a *query.Administration) (query.OperationSpec, error) {
-	db, err := args.GetRequiredString("db")
-	if err != nil {
+	spec := new(FromOpSpec)
+
+	if db, ok, err := args.GetString("db"); err != nil {
 		return nil, err
+	} else if ok {
+		spec.Database = db
 	}
-	spec := &FromOpSpec{
-		Database: db,
+
+	if bucket, ok, err := args.GetString("bucket"); err != nil {
+		return nil, err
+	} else if ok {
+		spec.Bucket = bucket
+	}
+
+	if spec.Database == "" && spec.Bucket == "" {
+		return nil, errors.New("must specify one of db or bucket")
+	}
+	if spec.Database != "" && spec.Bucket != "" {
+		return nil, errors.New("must specify only one of db or bucket")
 	}
 
 	if array, ok, err := args.GetArray("hosts", semantic.String); err != nil {
@@ -49,6 +65,7 @@ func createFromOpSpec(args query.Arguments, a *query.Administration) (query.Oper
 			return nil, err
 		}
 	}
+
 	return spec, nil
 }
 
@@ -62,6 +79,7 @@ func (s *FromOpSpec) Kind() query.OperationKind {
 
 type FromProcedureSpec struct {
 	Database string
+	Bucket   string
 	Hosts    []string
 
 	BoundsSet bool
@@ -100,6 +118,7 @@ func newFromProcedure(qs query.OperationSpec, pa plan.Administration) (plan.Proc
 
 	return &FromProcedureSpec{
 		Database: spec.Database,
+		Bucket:   spec.Bucket,
 		Hosts:    spec.Hosts,
 	}, nil
 }
@@ -114,6 +133,7 @@ func (s *FromProcedureSpec) Copy() plan.ProcedureSpec {
 	ns := new(FromProcedureSpec)
 
 	ns.Database = s.Database
+	ns.Bucket = s.Bucket
 
 	if len(s.Hosts) > 0 {
 		ns.Hosts = make([]string, len(s.Hosts))
@@ -144,7 +164,7 @@ func (s *FromProcedureSpec) Copy() plan.ProcedureSpec {
 	return ns
 }
 
-func createFromSource(prSpec plan.ProcedureSpec, id execute.DatasetID, a execute.Administration) (execute.Source, error) {
+func createFromSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID, a execute.Administration) (execute.Source, error) {
 	spec := prSpec.(*FromProcedureSpec)
 	var w execute.Window
 	if spec.WindowSet {
@@ -167,15 +187,27 @@ func createFromSource(prSpec plan.ProcedureSpec, id execute.DatasetID, a execute
 		Start: a.ResolveTime(spec.Bounds.Start),
 		Stop:  a.ResolveTime(spec.Bounds.Stop),
 	}
-	sr, err := storage.NewReader(a.Config()["storage"].(storage.Config))
-	if err != nil {
-		return nil, err
+
+	deps := a.Dependencies()[FromKind].(storage.Dependencies)
+	orgID := a.OrganizationID()
+
+	var bucketID id.ID
+	if spec.Database == "" {
+		b, ok := deps.BucketLookup.Lookup(orgID, spec.Bucket)
+		if !ok {
+			return nil, fmt.Errorf("could not find bucket %q", spec.Bucket)
+		}
+		bucketID = b
+	} else {
+		bucketID = id.ID(spec.Bucket)
 	}
+
 	return storage.NewSource(
-		id,
-		sr,
+		dsid,
+		deps.Reader,
 		storage.ReadSpec{
-			Database:        spec.Database,
+			OrganizationID:  orgID,
+			BucketID:        bucketID,
 			Hosts:           spec.Hosts,
 			Predicate:       spec.Filter,
 			PointsLimit:     spec.PointsLimit,
@@ -193,4 +225,12 @@ func createFromSource(prSpec plan.ProcedureSpec, id execute.DatasetID, a execute
 		w,
 		currentTime,
 	), nil
+}
+
+func InjectFromDependencies(depsMap execute.Dependencies, deps storage.Dependencies) error {
+	if err := deps.Validate(); err != nil {
+		return err
+	}
+	depsMap[FromKind] = deps
+	return nil
 }
