@@ -254,19 +254,17 @@ func getDirs(path string) ([]string, error) {
 	return dirs, nil
 }
 
+// LoadQuery returns the ifql query q, unless the first character of q is "@",
+// in which case the @ prefix is removed and the contents of the file specified in q are returned.
 func LoadQuery(q string) (string, error) {
 	if len(q) > 0 && q[0] == '@' {
-		f, err := os.Open(q[1:])
+		data, err := ioutil.ReadFile(q[1:])
 		if err != nil {
 			return "", err
 		}
-		defer f.Close()
 
-		data, err := ioutil.ReadAll(f)
-		if err != nil {
-			return "", err
-		}
-		q = string(data)
+		return string(data), nil
 	}
+
 	return q, nil
 }
