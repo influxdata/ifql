@@ -6,9 +6,9 @@ fromRange = (forDB, start, end=now()) => from(db:forDB) |> range(start:start, en
 
 
 // Quickly get fields, measurements
-field = (f, table=<-) => filter(table:table, fn: (r) => r._field == f)
-measurement = (m, table=<-) => filter(table:table, fn: (r) => r._measurement == m)
-select = (measurement, field, table=<-) => projectMeasurement(m:measurement, table:table) |> projectField(f:field)
+field = (name, table=<-) => filter(table:table, fn: (r) => r._field == f)
+measurement = (name, table=<-) => filter(table:table, fn: (r) => r._measurement == m)
+select = (measurement, field, table=<-) => measurement(name:measurement, table:table) |> field(name:field)
 
 
 
@@ -20,7 +20,13 @@ withTags = (table=<-, tagsvalues={}) =>
 
 
 
-
+// a shortcut that will at least be useful internally if not for the end user
+// if the planner is smart enough, it will skip either window() or group()
+// if it's not needed.
+oneblock = (table=<-) =>
+                table
+                  |> window()
+                  |> group()
 
 
 //  Summarize helpers
@@ -29,7 +35,7 @@ summarizeGroup = (table=<-, aggFn, measurement, field, groupby=["host"]) =>
                        |> select(measurement: measurement, field: field)
                        |> group(by: groupby)
                        |> aggFn()
-                       |> group()
+                       |> oneblock()
 
 summarizeWindow = (table=<-, aggFn, measurement, field, every, period) =>
                      table
@@ -39,18 +45,13 @@ summarizeWindow = (table=<-, aggFn, measurement, field, every, period) =>
                        |> window()
 
 
-summarize = (table=<-, aggFn, measurement, field, every, period) =>
+summarize = (table=<-, aggFn, measurement, field, every, period, groupby) =>
                      table
                        |> select(measurement: measurement, field: field)
                        |> window(every:every, period: period)
+                       |> group(by: groupby)
                        |> aggFn()
-                       |> window()
-
-// a shortcut that will at least be useful internally if not for the end user
-oneblock = (table=<-) =>
-                table
-                  |> window()
-                  |> group()
+                       |> oneblock()
 
 
 
