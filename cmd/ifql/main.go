@@ -53,7 +53,8 @@ func usage() {
 	fmt.Println()
 	fmt.Println("If no query is provided an interactive REPL will be run.")
 	fmt.Println()
-	fmt.Println("The query argument is either a string query or a path to a file prefixed with an '@'.")
+	fmt.Println("The query argument is either a literal query, - indicating to read from stdin,")
+	fmt.Println("or a path to a file prefixed with an '@'.")
 	fmt.Println()
 	fmt.Println("Options:")
 
