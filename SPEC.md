@@ -27,7 +27,7 @@ Productions are expressions constructed from terms and the following operators, 
 
 Lower-case production names are used to identify lexical tokens.
 Non-terminals are in CamelCase.
-Lexical tokens are enclosed in double quotes "".
+Lexical tokens are enclosed in double quotes "" or back quotes \`\`.
 
 ### Representation
 
@@ -94,7 +94,7 @@ The following keywords are reserved and may not be used as identifiers:
     and    import  not  return
     empty  in      or
 
-TODO(nathanielc): Add support for `in` and `emprty` operators
+TODO(nathanielc): Add support for `in` and `empty` operators
 TODO(nathanielc): Add support for `import` statements
 
 #### Operators
@@ -107,9 +107,20 @@ The following character sequences represent operators:
     /   <=   =    ,   :
     %   >=   <-   .   |>
 
-#### Integer literals
+#### Numeric literals
 
-An integer literal is a sequence of digits representing an integer constant.
+Numeric literals may be integers or floating point values.
+Literals have arbitrary precision and will be coerced to a specific type when used.
+
+The following coercion rules apply to numeric literals:
+
+* an integer literal can be coerced to an "int", "uint", or "float" type,
+* an float literal can be coerced to a "float" type,
+* an error will occur if the coerced type cannot represent the literal value.
+
+##### Integer literals
+
+An integer literal is a sequence of digits representing an integer value.
 Only decimal integers are supported.
 
     int_lit     = "0" | decimal_lit .
@@ -121,14 +132,9 @@ Examples:
     42
     317316873
 
-#### Unsigned Integer literals
+##### Floating-point literals
 
-TODO We need unsigned literals since we do not have explicit type declarations.
-Or we need to solve for all number literal types in an unambiguous manner.
-
-#### Floating-point literals
-
-A floating-point literal is a decimal representation of a floating-point constant.
+A floating-point literal is a decimal representation of a floating-point value.
 It has an integer part, a decimal point, and a fractional part.
 The integer and fractional part comprise decimal digits.
 One of the integer part or the fractional part may be elided.
@@ -179,6 +185,7 @@ Examples:
 
 A date and time literal represents a specific moment in time.
 It has a date part, a time part and a time offset part.
+The format follows the RFC 3339 specification.
 
     date_time_lit     = date "T" time .
     date              = year_lit "-" month "-" day .
@@ -192,20 +199,84 @@ It has a date part, a time part and a time offset part.
     fractional_second = "."  { decimal_digit } .
     time_offset       = "Z" | ("+" | "-" ) hour ":" minute .
 
+
 #### String literals
 
-A string literal represents a sequence of characters.
-String literals are enclosed in double quotes.
-Any double quotes contained withing the string must be escaped using the backslash character "\".
-String literals may not span multiple lines.
+A string literal represents a sequence of characters enclosed in double quotes.
+Within the quotes any character may appear except an unescaped double quote.
+String literals support several escape sequences.
 
-    string_lit             = `"` { unicode_char } `"` .
+    \n   U+000A line feed or newline
+    \r   U+000D carriage return
+    \t   U+0009 horizontal tab
+    \"   U+0022 double quote
+    \\   U+005C backslash
+    \{   U+007B open curly bracket
+    \}   U+007D close curly bracket
 
-TODO(nathanielc): Do we want to support byte value strings? i.e. "\u65e5\u672c\u8a9e" for "日本語"?
-Is there a way to introduce new escape sequences without breaking existing code?
+Additionally any byte value may be specified via a hex encoding using `\x` as the prefix.
 
-TODO(nathanielc): How will we support multiline string literals?
-We will likely have large string literals for formatting alert messages and the like.
+
+    string_lit       = `"` { unicode_value | byte_value | StringExpression | newline } `"` .
+    byte_value       = `\` "x" hex_digit hex_digit .
+    hex_digit        = "0" … "9" | "A" … "F" | "a" … "f" .
+    unicode_value    = unicode_char | escaped_char .
+    escaped_char     = `\` ( "n" | "r" | "t" | `\` | `"` ) .
+    StringExpression = "{" Expression "}" .
+
+TODO(nathanielc): With string interpolation string_lit is not longer a lexical token as part of a literal, but an entire expression in and of itself.
+
+
+Examples:
+
+    "abc"
+    "string with double \" quote"
+    "string with backslash \\"
+    "日本語"
+    "\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e" // the explicit UTF-8 encoding of the previous line
+
+String literals are also interpolated for embedded expressions to be evaluated as strings.
+Embedded expressions are enclosed in curly brackets "{}".
+The expressions are evaluated in the scope containing the string literal.
+The result of an expression is formatted as a string and replaces the string content between the brackets.
+All types are formatted as strings according to their literal representation.
+A function "printf" exists to allow more precise control over formatting of various types.
+To include the literal curly brackets within a string they must be escaped.
+
+
+Interpolation example:
+
+    n = 42
+    "the answer is {n}" // the answer is 42
+    "the answer is not {n+1}" // the answer is not 43
+    "openinng curly bracket \{" // openinng curly bracket {
+    "closing curly bracket \}" // closing curly bracket }
+
+
+#### Regular expression literals
+
+A regular expression literal represents a regular expression pattern, enclosed in forward slashes.
+Within the forward slashes, any unicode character may appear except for an unescaped forward slash.
+The `\x` hex byte value representation from string literals may also be present.
+
+Regular expression literals support only the following escape sequences:
+
+    \/   U+002f forward slash
+    \\   U+005c backslash
+
+
+    regexp_lit         = "/" { unicode_char | byte_value | regexp_escape_char } "/" .
+    regexp_escape_char = `\` (`/` | `\`)
+
+Examples:
+
+    /.*/
+    /http:\/\/localhost:9999/
+    /^\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e(ZZ)?$/
+    /^日本語(ZZ)?$/ // the above two lines are equivalent
+    /\\xZZ/ // this becomes the literal pattern "\xZZ"
+
+The regular expression syntax is defined by [RE2](https://github.com/google/re2/wiki/Syntax).
 
 ### Variables
 
@@ -277,6 +348,12 @@ A _function type_ represents a set of all functions with the same argument and r
 
 TODO(nathanielc): We want to have polymorphic function signatures, via free type variables.
 A function signature needs to be able to express its free type variables.
+For example: Specify how its possible to have both a string literal or function value passed as an argument
+ var m = ...
+ |> alert(message: (r) => { h = r.host + "asdfasdf" return "$(m) $(r.host) $(round(n:r._value)")
+ |> alert(message: "hi")
+
+ How to allow nice formatting of float values within interpolation?
 
 ### Blocks
 
@@ -445,6 +522,10 @@ Should they be defined in both places?
 Should only helper functions be defined here?
 Should all built-in functions/operations be defined somewhere else?
 
+List functions that create a single operation....
+
+Call out functions that are not one-to-one with an operation
+
 
 ## Query engine
 
@@ -477,30 +558,27 @@ The available data types for a column are:
     int      a signed 64-bit integer
     float    an IEEE-754 64-bit floating-point number
     string   a sequence of unicode characters
+    bytes    a sequence of byte values
     time     a nanosecond precision instant in time
     duration a nanosecond precision duration of time
 
-TODO(nathanielc): Is a string data type really a bytes data type?
-Or should we specify both types?
 
 #### Table
 
 A table is set of records, with a common set of columns and a partition key.
 
-A table's partition key denotes which partition of data is assigned to the table.
-The partition key contains time bounds and a set of tags.
-The time bounds specify and inclusive lower bound and exclusive upper bound.
-The tags are a set of key value pairs of strings.
+The partition key is a list of columns.
+A table's partition key denotes which subset of the entire dataset is assigned to the table.
+As such, all records within a table will have the same values for each column that is part of the partition key.
+These common values are referred to as the partition key value, and can be represented as a set of key value pairs.
 
-A tables partition key is represented as columns on the table.
-Each tag key is a column.
-The lower time bound is the `_start` column and the upper time bound is the `_stop` column.
+A tables schema consists of its partition key, and its column's labels and types.
 
 #### Stream
 
 A stream represents a potentially unbounded dataset.
 A stream partitioned into individual tables.
-Within a stream each table's partition key is unique.
+Within a stream each table's partition key value is unique.
 
 #### Missing values
 
@@ -515,7 +593,7 @@ All operations may consume a stream and always produce a new stream.
 
 Most operations output one table for every table they receive from the input stream.
 
-Operations that modify the partition keys or that modify the data within the keys will need to repartition the tables in the output stream.
+Operations that modify the partition keys or values will need to repartition the tables in the output stream.
 
 ### Built-in operations
 
@@ -539,6 +617,14 @@ The from operation has the following properties:
 #### Yield
 
 TODO(nathanielc): Specify yield operations
+
+#### Collate
+
+TODO(nathanielc): Need a simple function to collapse fields into same table.
+
+#### Multiple aggregates 
+
+TODO(nathanielc): Need a way to apply multiple aggregates to same table
 
 #### Aggregate operations
 
@@ -662,7 +748,7 @@ The following properties define how the sample is selected.
 
 Filter applies a predicate function to each input record, output tables contain only records which matched the predicate.
 One output table is produced for each input table.
-The output tables will have the same partition key and columns as their corresponding input table.
+The output tables will have the same schema as their corresponding input tables.
 
 Filter has the following properties:
 
@@ -695,15 +781,15 @@ Map has the following properties:
 
 * `fn` function
     Function to apply to each record.
-    The return value of the function may be a single value or an object.
-    TODO(nathanielc): Should we for the map function to always return an object, i.e. complete record object?
+    The return value must be an object.
+    Only properties defined on the return object will be present on the output records.
 
 #### Range
 
 Range filters records based on provided time bounds.
 Each input tables records are filtered to contain only records that exist within the time bounds.
-Each input table's partition key is modified to fit within the range bounds.
-Tables where all records exists outside the range bounds are filtered entirely.
+Each input table's partition key value is modified to fit within the time bounds.
+Tables where all records exists outside the time bounds are filtered entirely.
 
 TODO(nathanielc): is there a way to make range default to aligned times so that you do not get incomplete windows?
 Or maybe helper function for that purpose?
@@ -732,7 +818,7 @@ If the column that is modified is part of the partition key, then the output tab
 
 Sorts orders the records within each table.
 One output table is produced for each input table.
-The output tables have the same partition key and columns as their corresponding input tables.
+The output tables will have the same schema as their corresponding input tables.
 
 Sort has the following properties:
 
@@ -746,7 +832,7 @@ Sort has the following properties:
 #### Group
 
 Group partitions records based on their values for specific columns.
-It produces tables with new partition keys based on the provided columns.
+It produces tables with new partition keys based on the provided properties.
 
 Group has the following properties:
 
@@ -773,9 +859,10 @@ Examples:
 
 #### Window
 
-Window partitions records based on the value of their `_time` column.
-It produces tables with new partition keys based on the new time bounds.
-A single input record may exist in zero or more output tables.
+Window partitions records based on a time value.
+New columns are added to uniquely identify each window and those columns are added to the partition key of the output tables.
+
+A single input record will be placed into zero or more output tables, depending on the specific windowing function.
 
 Window has the following properties:
 
@@ -790,25 +877,34 @@ Window has the following properties:
 * `round` duration
     Rounds a window's bounds to the nearest duration
     Defaults to `every`'s value
+* `column` string
+    Name of the time column to use. Defaults to `_time`.
+* `startCol` string
+    Name of the column containing the window start time. Defaults to `_start`.
+* `stopCol` string
+    Name of the column containing the window stop time. Defaults to `_stop`.
 
 
 #### Join
 
 Join merges two or more input streams into a single output stream.
-Output tables will have a partition key based on the join columns and the input table time bounds.
+Input tables are matched and then each of their records are joined into a single output table.
+Input tables match if their partition key values match for the provided list of join columns.
+The output table partition key will be the list of join columns.
 
+The join operation compares values based on equality.
 
 Join has the following properties:
 
 * `tables` map of tables
     Map of tables to join. Currently only two tables are allowed.
 * `on` array of strings
-    List of tag keys that when equal produces a result set.
+    List of columns on which to join the tables.
 * `fn`
     Defines the function that merges the values of the tables.
     The function must defined to accept a single parameter.
-    The parameter is a map, which uses the same keys found in the `tables` map.
-    The function is called for each joined set of records from the tables.
+    The parameter is an object where the value of each key is a corresponding record from the input streams.
+    The return value must be an object which defines the output record structure.
 
 
 #### Type conversion operations
@@ -877,6 +973,14 @@ The function `toUInt` is defined as `toUInt = (table=<-) => table |> map(fn:(r) 
 If you need to convert other columns use the `map` function directly with the `uint` function.
 
 
+### Composite data types
+
+A composite data type is a collection of primitive data types that together have a higher meaning.
+
+#### Histogram data type
+
+Histogram is a composite type that represents a descrete cummulative distribution.
+Given a histogram with N buckets there will be N columns with the label `le_X` where `X` is replaced with the upper bucket boundary.
 
 ### Triggers
 
@@ -891,15 +995,17 @@ Triggers can fire based on these inputs:
 | -----                   | -----------                                                                                       |
 | Current processing time | The current processing time is the system time when the trigger is being evaluated.               |
 | Watermark time          | The watermark time is a time where it is expected that no data will arrive that is older than it. |
-| Time bounds             | The time bounds of the table.                                                                     |
 | Record count            | The number of records currently in the table.                                                     |
+| Partition key value     | The partition key value of the table.                                                             |
 
 Additionally triggers can be _finished_, which means that they will never fire again.
 Once a trigger is finished, its associated table is deleted.
 
-Currently all tables use an _after watermark_ trigger which fires only once the watermark has exceeded the time bounds of the table and then is immediately finished.
+Currently all tables use an _after watermark_ trigger which fires only once the watermark has exceeded the `_stop` value of the table and then is immediately finished.
 
-Data sources are responsible for updating the watermark for a given read operation.
+TODO(nathanielc): This treats the `_stop` column as special, we need to allow for users to define the trigger incase they do not have a `_stop` column.
+
+Data sources are responsible for informing about updates to the watermark.
 
 ### Execution model
 
@@ -921,7 +1027,8 @@ When submitting a query specification directly the `Content-Type` header is used
 ### Response format
 
 The result of a query is any number of named streams.
-As a stream consists of multiple tables each table is encoded as CSV UTF-8 textual data.
+As a stream consists of multiple tables each table is encoded as CSV textual data.
+CSV data should be encoded using UTF-8, and should be in Unicode Normal Form C as defined in [UAX15](https://www.w3.org/TR/2015/REC-tabular-data-model-20151217/#bib-UAX15).
 
 Before each table there are two header rows.
 The first declares the data types of each column, the second declares the column labels.
@@ -932,7 +1039,7 @@ In addition to the columns on the tables themselves three additional columns are
 
 * meta - the first column is always a meta column.
     The values `#datatype` and `#error` are the only permissible values in the meta column.
-* result name - the second column is the user defined name of the result the record belongs to.
+* result name - the second column is the user defined name of the result to which the record belongs.
 * table - is a unique value to identify each table within a result.
 
 
@@ -946,13 +1053,12 @@ The possible data types are:
 | long         | int       | a signed 64-bit integer                                                              |
 | double       | float     | a IEEE-754 64-bit floating-point number                                              |
 | string       | string    | a UTF-8 encoded string                                                               |
+| base64Binary | bytes     | a base64 encoded sequence of bytes as defined in RFC 4648                            |
 | dateTime     | time      | an instant in time, may be followed with a colon `:` and a description of the format |
 | duration     | duration  | a length of time represented as an unsigned 64-bit integer number of nanoseconds     |
 
-TODO(nathanielc): Again we probably need an explicit bytes type that is hex encoded or something.
-
-When error occurs during execution the meta column will contain an `#error` value, followed by column labels for properties of the error.
-The error properties are contained in the second row of the result.
+When an error occurs during execution the meta column will contain an `#error` value, followed by column labels for properties of the error.
+The error's properties are contained in the second row of the result.
 
 
 Example encoding with two tables in the same result:
@@ -975,4 +1081,8 @@ Example error encoding:
 
     #error,message,reference
     ,Failed to parse query,897
+
+
+TODO Do we want to be compliant with the `text/csv` MIME type? https://tools.ietf.org/html/rfc4180 That specification requires that we use CRLF line endings.
+Also this standard allows LF line endings and acknowledges that its not technically compliant https://www.w3.org/TR/tabular-data-model/ with `text/csv`.
 
