@@ -172,6 +172,20 @@ func TestEval(t *testing.T) {
 			`,
 		},
 		{
+			name: "nested scope mutations not visible outside",
+			query: `
+			x = 5
+            xinc = () => {
+                x = x + 1
+                return x
+            }
+            xinc() == 6 or fail()
+            x == 5 or fail()
+            x = 1
+            xinc() == 2 or fail()
+            `,
+		},
+		{
 			name: "return map from func",
 			query: `
             toMap = (a,b) => ({
