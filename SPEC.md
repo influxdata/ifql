@@ -160,16 +160,16 @@ Multiple duration may be specified together and the resulting duration is the su
     duration_lit        = { int_lit duration_unit } .
     duration_unit       = "ns" | "u" | "µ" | "ms" | "s" | "m" | "h" | "d" | "w" .
 
-| Units  | Meaning                                 |
-| -----  | -------                                 |
-| ns     | nanoseconds (1 billionth of a second)   |
-| u or µ | microseconds (1 millionth of a second)  |
-| ms     | milliseconds (1 thousandth of a second) |
-| s      | second                                  |
-| m      | minute (60 seconds)                     |
-| h      | hour (60 minutes)                       |
-| d      | day (24 hours)                          |
-| w      | week (7 days)                           |
+| Units    | Meaning                                 |
+| -----    | -------                                 |
+| ns       | nanoseconds (1 billionth of a second)   |
+| us or µs | microseconds (1 millionth of a second)  |
+| ms       | milliseconds (1 thousandth of a second) |
+| s        | second                                  |
+| m        | minute (60 seconds)                     |
+| h        | hour (60 minutes)                       |
+| d        | day (24 hours)                          |
+| w        | week (7 days)                           |
 
 Durations represent a fixed length of time.
 They do not change based on time zones or other time related events like daylight savings or leap seconds.
@@ -293,7 +293,7 @@ TODO(nathanielc): Specify how type inference works. Currently it doesn't work ;)
 
 #### Boolean types
 
-A _boolean type_ represents a truth value, corresponding to the predeclared variables `true` and `false`.
+A _boolean type_ represents a truth value, corresponding to the preassigned variables `true` and `false`.
 The boolean type name is `bool`.
 
 #### Numeric types
@@ -367,79 +367,45 @@ In addition to explicit blocks in the source code, there are implicit blocks:
 1. The _universe block_ encompasses all IFQL source text.
 2. Each package has a _package block_ containing all IFQL source text for that package.
 3. Each file has a _file block_ containing all IFQL source text in that file.
-4. Each function declaration has its own _function block_ even if not explicitly declared.
+4. Each function literal has its own _function block_ even if not explicitly declared.
 
 Blocks nest and influence scoping.
 
-### Declarations and scope
+### Assignment and scope
 
-A declaration binds an identifier to a variable or function.
-Every identifier in a program must be declared.
-No identifier may be declared twice in the same block, and no identifier may be declared both in the file and package block.
+An assignment binds an identifier to a variable or function.
+Every identifier in a program must be assigned.
+An identifier may not change type via assignment within the same block.
+An identifier may change value via assignment within the same block.
 
 IFQL is lexically scoped using blocks:
 
-1. The scope of a predeclared identifier is in the universe block.
+1. The scope of a preassigned identifier is in the universe block.
 2. The scope of an identifier denoting a variable or function at the top level (outside any function) is the package block.
 3. The scope of a package name of an imported package is the file block of the file containing the import declaration.
 4. The scope of an identifier denoting a function argument is the function body.
-5. The scope of a variable declared inside a function is the innermost containing block.
+5. The scope of a variable assigned inside a function is the innermost containing block.
 
-An identifier declared in a block may be redeclared in an inner block.
-While the identifier of the inner declaration is in scope, it denotes the entity declared by the inner declaration.
+An identifier assigned in a block may be reassigned in an inner block.
+While the identifier of the inner assignment is in scope, it denotes the entity assigned by the inner assignment.
 
-The package clause is not a declaration; the package name does not appear in any scope.
+The package clause is not a assignment; the package name does not appear in any scope.
 Its purpose is to identify the files belonging to the same package and to specify the default package name for import declarations.
 
-#### Variable declarations
+#### Variable assignment
 
-A variable declaration creates a variable bound to the identifier and gives it a type and initial value.
+A variable assignment creates a variable bound to the identifier and gives it a type and value.
+When the identifier was previously assigned within the same block the identifier now holds the new value.
+An identifier cannot change type within the same block.
 
-    VarDecl = identifier "=" Expression
+    VarAssignment = identifier "=" Expression
 
 Examples:
 
     n = 1
+    n = 2
     f = 5.4
     r = z()
-
-#### Function declarations
-
-A function declaration defines the function parameters, their default values and the body of the function.
-The function body may be a block or a single expression.
-The function body must have a return statement if it is a block, otherwise the expression is the return value.
-
-    FunctionDecl = FunctionParameters "=>" FunctionBody .
-    FunctionParameters = "(" [ ParameterList [ "," ] ] ")" .
-    ParameterList = ParameterDecl { "," ParameterDecl } .
-    ParameterDecl = identifier [ "=" Expression ] .
-    FunctionBody = Expression | Block .
-
-
-Examples:
-
-    () => 1 // function returns the value 1
-    (a,b) => a + b // function returns the sum of a and b
-    (x=1,y=1) => x * y // function with default values
-    (a,b,c) => { // function with a block body
-        d = a + b
-        return d / c
-    }
-
-All function declarations are anonymous.
-A function may be given a name using a variable declaration.
-
-    add = (a,b) => a + b
-    mul = (a,b) => a * b
-
-
-All functions are pure in that they do not have side effects, with the exception of a built-in yield function.
-
-TODO(nathanielc): Specify closures and the mutability of their scope
-
-TODO(nathanielc): Function declarations are also function expressions.
-
-
 
 
 ### Expressions
@@ -457,6 +423,36 @@ PEG parsers don't understand operators precedence so it difficult to express ope
 We should simplify it and use the EBNF grammar.
 This requires redoing the parser in something besides PEG.
 
+#### Function literals
+
+A function literal defines a new function with a body and parameters.
+The function body may be a block or a single expression.
+The function body must have a return statement if it is an explicit block, otherwise the expression is the return value.
+
+    FunctionLit        = FunctionParameters "=>" FunctionBody .
+    FunctionParameters = "(" [ ParameterList [ "," ] ] ")" .
+    ParameterList      = ParameterDecl { "," ParameterDecl } .
+    ParameterDecl      = identifier [ "=" Expression ] .
+    FunctionBody       = Expression | Block .
+
+Examples:
+
+    () => 1 // function returns the value 1
+    (a, b) => a + b // function returns the sum of a and b
+    (x=1, y=1) => x * y // function with default values
+    (a, b, c) => { // function with a block body
+        d = a + b
+        return d / c
+    }
+
+All function literals are anonymous.
+A function may be given a name using a variable assignment.
+
+    add = (a,b) => a + b
+    mul = (a,b) => a * b
+
+Function literals are _closures_: they may refer to variables defined is a surrounding block.
+Those variables are shared between the function literal and the surrounding block.
 
 #### Call expressions
 
@@ -472,15 +468,18 @@ Examples:
 A pipe expression is a call expression with an implicit piped argument.
 Pipe expressions simplify creating long nested call chains.
 
-A pipe expression passes the result of the left hand expression as the _pipe_ argument to the right hand call expression.
-Function declarations specify which if any argument is the _pipe_ argument.
+Pipe expressions pass the result of the left hand expression as the _pipe argument_ to the right hand call expression.
+Function literals specify which if any argument is the pipe argument using the _pipe literal_ as the argument's default value.
+It is an error to use a pipe expression if the function does not declare a pipe argument.
+
+    pipe_lit = "<-" .
 
 Examples:
 
-    foo = (x=<-) => // function body elided
+    foo = () => // function body elided
     bar = (x=<-) => // function body elided
-    baz = (x=<-) => // function body elided
-    foo() |> bar() |> baz() // equivalent to baz(x:bar(x:foo()))
+    baz = (y=<-) => // function body elided
+    foo() |> bar() |> baz() // equivalent to baz(x:bar(y:foo()))
 
 ### Statements
 
@@ -512,20 +511,96 @@ Examples:
 
 ### Built-in functions
 
-The following functions are predeclared in the universe block.
+The following functions are preassigned in the universe block.
+
+#### Functions and Operations
+
+Many function's purpose is to construct an operation that will be part of a query specification.
+As a result these functions return an object that represents the specific operation being defined.
+The object is then passed into the next function and added as a parent, constructing a directed acyclic graph of operations.
+The yield function then traverses the graph of operations and produces a query specification that can be executed.
+
+The following is a list of functions who's main purpose is to construct an operation.
+Details about their arguments and behavior can be found in the Operations section of this document.
+
+* count
+* covariance
+* cumulativeSum
+* derivative
+* difference
+* distinct
+* filter
+* first
+* from
+* group
+* integral
+* join
+* last
+* limit
+* map
+* max
+* mean
+* min
+* percentile
+* range
+* sample
+* set
+* shift
+* skew
+* sort
+* spread
+* stateTracking
+* stddev
+* sum
+* window
+* yield
+
+Other functions make use of existing operations to create composite operations.
+
+##### Cov
+
+Cov computes the covariance between two streams by first joining the streams and then performing the covariance operation.
+
+##### HighestMax
+
+HighestMax computes the top N records from all tables using the maximum of each table.
+
+##### HighestAverage
+
+HighestAverage computes the top N records from all tables using the average of each table.
+
+##### HighestCurrent
+
+HighestCurrent computes the top N records from all tables using the last value of each table.
+
+##### LowestMin
+
+LowestMin computes the bottom N records from all tables using the minimum of each table.
+
+##### LowestAverage
+
+LowestAverage computes the bottom N records from all tables using the average of each table.
+
+##### LowestCurrent
+
+LowestCurrent computes the bottom N records from all tables using the last value of each table.
+
+##### Pearsonr
+
+Pearsonr computes the Pearson R correlation coefficient between two streams by first joining the streams and then performing the covariance operation normalized to compute R.
+
+##### StateCount
+
+StateCount computes the number of consecutive records in a given state.
+
+##### StateDuration
+
+StateDuration computes the duration of a given state.
 
 
-#### ...
+##### Top/Bottom
 
-TODO(nathanielc): Should these be defined here instead of at the operations section?
-Should they be defined in both places?
-Should only helper functions be defined here?
-Should all built-in functions/operations be defined somewhere else?
-
-List functions that create a single operation....
-
-Call out functions that are not one-to-one with an operation
-
+Top and Bottom sort a table and limits the table to only n records.
 
 ## Query engine
 
@@ -537,7 +612,7 @@ The output of an IFQL program is a query specification, which then may be passed
 ### Query specification
 
 A query specification consists of a set of operations and a set of edges between those operations.
-The operations and edges must form a directed acyclic graph.
+The operations and edges must form a directed acyclic graph (DAG).
 
 ### Data model
 
@@ -616,15 +691,10 @@ The from operation has the following properties:
 
 #### Yield
 
-TODO(nathanielc): Specify yield operations
+Yield indicates that the stream received by the yield operation should be delivered as a result of the query.
+A query may have multiple results, each identified by the name provided to yield.
 
-#### Collate
-
-TODO(nathanielc): Need a simple function to collapse fields into same table.
-
-#### Multiple aggregates 
-
-TODO(nathanielc): Need a way to apply multiple aggregates to same table
+Yield outputs the input stream unmodified.
 
 #### Aggregate operations
 
@@ -662,6 +732,23 @@ For each aggregated column, it outputs the number of non null records as an inte
 Mean is an aggregate operation.
 For each aggregated column, it outputs the mean of the non null records as a float.
 
+##### Percentile
+
+Percentile is an aggregate operation.
+For each aggregated column, it outputs the value that represents the specified percentile of the non null record as a float.
+
+Percentile has the following properties:
+
+* `percentile` float
+    A value between 0 and 1 indicating the desired percentile.
+* `exact` bool
+    If true an exact answer is computed, otherwise an approximate answer is computed.
+    Using exact requires that the entire dataset fit in available memory.
+    Defaults to false.
+* `compression` float
+   Compression indicates how many centroids to use when compressing the dataset.
+   A larger number produces a more accurate result at the cost of increased memory requirements.
+   Defaults to 1000.
 
 ##### Skew
 
@@ -685,6 +772,11 @@ For each aggregated column, it outputs the standard deviation of the non null re
 Stddev is an aggregate operation.
 For each aggregated column, it outputs the sum of the non null record.
 The output column type is the same as the input column type.
+
+#### Multiple aggregates
+
+TODO(nathanielc): Need a way to apply multiple aggregates to same table
+
 
 #### Selector operations
 
@@ -884,6 +976,9 @@ Window has the following properties:
 * `stopCol` string
     Name of the column containing the window stop time. Defaults to `_stop`.
 
+#### Collate
+
+TODO(nathanielc): Need a simple function to collapse fields into same table.
 
 #### Join
 
@@ -906,6 +1001,19 @@ Join has the following properties:
     The parameter is an object where the value of each key is a corresponding record from the input streams.
     The return value must be an object which defines the output record structure.
 
+#### Covariance
+
+#### Cumulative sum
+
+#### Derivative
+
+#### Difference
+
+#### Distinct
+
+#### Integral
+
+#### Shift
 
 #### Type conversion operations
 
@@ -979,7 +1087,7 @@ A composite data type is a collection of primitive data types that together have
 
 #### Histogram data type
 
-Histogram is a composite type that represents a descrete cummulative distribution.
+Histogram is a composite type that represents a discrete cumulative distribution.
 Given a histogram with N buckets there will be N columns with the label `le_X` where `X` is replaced with the upper bucket boundary.
 
 ### Triggers
