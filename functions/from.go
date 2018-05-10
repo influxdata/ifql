@@ -199,7 +199,7 @@ func createFromSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID, a execu
 		}
 		bucketID = b
 	} else {
-		bucketID = id.ID(spec.Bucket)
+		bucketID = id.ID(spec.Database)
 	}
 
 	return storage.NewSource(
