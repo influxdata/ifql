@@ -50,6 +50,131 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			name: "int literal 42",
+			raw:  `42`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.IntegerLiteral{Value: 42},
+					},
+				},
+			},
+		},
+		{
+			name: "float literal 42.0",
+			raw:  `42.0`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.FloatLiteral{Value: 42},
+					},
+				},
+			},
+		},
+		{
+			name: "float literal 42.",
+			raw:  `42.`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.FloatLiteral{Value: 42},
+					},
+				},
+			},
+		},
+		{
+			name: "float literal .42",
+			raw:  `.42`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.FloatLiteral{Value: 0.42},
+					},
+				},
+			},
+		},
+		{
+			name: "float literal 0.42",
+			raw:  `0.42`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.FloatLiteral{Value: 0.42},
+					},
+				},
+			},
+		},
+		{
+			name: "duration literal 1s",
+			raw:  `1s`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.DurationLiteral{Value: time.Second},
+					},
+				},
+			},
+		},
+		{
+			name: "duration literal 1µ",
+			raw:  `1µ`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.DurationLiteral{Value: time.Microsecond},
+					},
+				},
+			},
+		},
+		{
+			name: "duration literal 2m30s",
+			raw:  `2m30s`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.DurationLiteral{Value: 2*time.Minute + 30*time.Second},
+					},
+				},
+			},
+		},
+		{
+			name: "date time literal",
+			raw:  `2018-05-05T05:05:05.0005+04:30`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.DateTimeLiteral{
+							Value: time.Date(2018, 5, 5, 5, 5, 5, 500000, time.FixedZone("+0430", int((4*time.Hour+30*time.Minute)/time.Second))),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "date time literal UTC",
+			raw:  `2018-05-05T05:05:05Z`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.DateTimeLiteral{
+							Value: time.Date(2018, 5, 5, 5, 5, 5, 0, time.UTC),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "string literal",
+			raw:  `"str literal"`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.StringLiteral{Value: "str literal"},
+					},
+				},
+			},
+		},
+		{
 			name: "identifier with number",
 			raw:  `tan2()`,
 			want: &ast.Program{
@@ -60,6 +185,18 @@ func TestParse(t *testing.T) {
 								Name: "tan2",
 							},
 						},
+					},
+				},
+			},
+		},
+		{
+			name: "identifier with partial keyword",
+			raw: `x = 5
+			incX = () => x + 1`,
+			want: &ast.Program{
+				Body: []ast.Statement{
+					&ast.ExpressionStatement{
+						Expression: &ast.Identifier{Name: "increment"},
 					},
 				},
 			},
