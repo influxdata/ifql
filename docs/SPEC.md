@@ -2,6 +2,9 @@
 
 The following document specifies the IFQL language and query execution.
 
+This document is a living document and does not represent the current implementation of IFQL.
+Any section that is not currently implemented is commented with a IMPL#XXX where XXX is an issue number tracking discussion and progress towards implementation.
+
 ## Language
 
 The IFQL language is centered on querying and manipulating time series data.
@@ -94,8 +97,8 @@ The following keywords are reserved and may not be used as identifiers:
     and    import  not  return
     empty  in      or
 
-TODO(nathanielc): Add support for `in` and `empty` operators
-TODO(nathanielc): Add support for `import` statements
+[IMPL#308](https://github.com/influxdata/ifql/issues/308) Add in and empty operator support
+[IMPL#142](https://github.com/influxdata/ifql/issues/142) Add "import" support
 
 #### Operators
 
@@ -117,6 +120,9 @@ The following coercion rules apply to numeric literals:
 * an integer literal can be coerced to an "int", "uint", or "float" type,
 * an float literal can be coerced to a "float" type,
 * an error will occur if the coerced type cannot represent the literal value.
+
+
+[IMPL#309](https://github.com/influxdata/ifql/issues/309) Allow numeric literal coercion.
 
 ##### Integer literals
 
@@ -151,6 +157,8 @@ Examples:
     2.71828
     .26
 
+[IMPL#310](https://github.com/influxdata/ifql/issues/310) Parse float literals
+
 #### Duration literals
 
 A duration literal is a representation of a length of time.
@@ -180,6 +188,8 @@ Examples:
     10d
     1h15m // 1 hour and 15 minutes
     5w
+
+[IMPL#311](https://github.com/influxdata/ifql/issues/311) Parse duration literals
 
 #### Date and time literals
 
@@ -227,6 +237,9 @@ Additionally any byte value may be specified via a hex encoding using `\x` as th
 TODO(nathanielc): With string interpolation string_lit is not longer a lexical token as part of a literal, but an entire expression in and of itself.
 
 
+[IMPL#312](https://github.com/influxdata/ifql/issues/312) Parse string literals
+
+
 Examples:
 
     "abc"
@@ -244,6 +257,8 @@ A function "printf" exists to allow more precise control over formatting of vari
 To include the literal curly brackets within a string they must be escaped.
 
 
+[IMPL#316](https://github.com/influxdata/ifql/issues/316) Add printf function
+
 Interpolation example:
 
     n = 42
@@ -251,6 +266,8 @@ Interpolation example:
     "the answer is not {n+1}" // the answer is not 43
     "openinng curly bracket \{" // openinng curly bracket {
     "closing curly bracket \}" // closing curly bracket }
+
+[IMPL#313](https://github.com/influxdata/ifql/issues/313) Add string interpolation support
 
 
 #### Regular expression literals
@@ -278,6 +295,9 @@ Examples:
 
 The regular expression syntax is defined by [RE2](https://github.com/google/re2/wiki/Syntax).
 
+
+[IMPL#314](https://github.com/influxdata/ifql/issues/314) Parse regular expression literals
+
 ### Variables
 
 A variable holds a value.
@@ -289,7 +309,7 @@ A type defines the set of values and operations on those values.
 Types are never explicitly declared as part of the syntax.
 Types are always inferred from the usage of the value.
 
-TODO(nathanielc): Specify how type inference works. Currently it doesn't work ;)
+[IMPL#315](https://github.com/influxdata/ifql/issues/315) Specify type inference rules
 
 #### Boolean types
 
@@ -346,14 +366,8 @@ The value may be any other type, and need not be the same as other values within
 
 A _function type_ represents a set of all functions with the same argument and result types.
 
-TODO(nathanielc): We want to have polymorphic function signatures, via free type variables.
-A function signature needs to be able to express its free type variables.
-For example: Specify how its possible to have both a string literal or function value passed as an argument
- var m = ...
- |> alert(message: (r) => { h = r.host + "asdfasdf" return "$(m) $(r.host) $(round(n:r._value)")
- |> alert(message: "hi")
 
- How to allow nice formatting of float values within interpolation?
+[IMPL#315](https://github.com/influxdata/ifql/issues/315) Specify type inference rules
 
 ### Blocks
 
@@ -392,6 +406,9 @@ While the identifier of the inner assignment is in scope, it denotes the entity 
 The package clause is not a assignment; the package name does not appear in any scope.
 Its purpose is to identify the files belonging to the same package and to specify the default package name for import declarations.
 
+
+[IMPL#317](https://github.com/influxdata/ifql/issues/317) Add package/namespace support
+
 #### Variable assignment
 
 A variable assignment creates a variable bound to the identifier and gives it a type and value.
@@ -422,6 +439,9 @@ TODO(nathanielc): Fill out expression details...
 PEG parsers don't understand operators precedence so it difficult to express operators in expressions with the grammar.
 We should simplify it and use the EBNF grammar.
 This requires redoing the parser in something besides PEG.
+
+
+[IMPL#318](https://github.com/influxdata/ifql/issues/318) Update parser to use formal EBNF grammar.
 
 #### Function literals
 
@@ -457,6 +477,9 @@ Those variables are shared between the function literal and the surrounding bloc
 #### Call expressions
 
 A call expressions invokes a function with the provided arguments.
+Arguments must be specified using the argument name, positional arguments not supported.
+Argument order does not matter.
+When an argument has a default value, it is not required to be specified.
 
 Examples:
 
@@ -485,10 +508,8 @@ Examples:
 
 A statement controls execution.
 
-    Statement = Declaration | ReturnStatement |
+    Statement = VarAssignment | ReturnStatement |
                 ExpressionStatement | BlockStatment .
-    Declaration = VarDecl .
-
 
 #### Return statements
 
@@ -649,6 +670,11 @@ These common values are referred to as the partition key value, and can be repre
 
 A tables schema consists of its partition key, and its column's labels and types.
 
+
+[IMPL#294](https://github.com/influxdata/ifql/issues/294) Remove concept of Kind from table columns
+[IMPL#319](https://github.com/influxdata/ifql/issues/319) Remove concept of Bounds from tables
+[IMPL#320](https://github.com/influxdata/ifql/issues/320) Rename block to table
+
 #### Stream
 
 A stream represents a potentially unbounded dataset.
@@ -660,6 +686,9 @@ Within a stream each table's partition key value is unique.
 A record may be missing a value for a specific column.
 Missing values are represented will a special _null_ value.
 The _null_ value can be of any data type.
+
+
+[IMPL#219](https://github.com/influxdata/ifql/issues/219) Design how nulls behave
 
 #### Operations
 
@@ -721,11 +750,12 @@ All aggregate operations have the following properties:
     timeValue specifies which time value to use on the resulting aggregate record.
     The value must be one of `_start`, or `_stop`.
 
+[IMPL#294](https://github.com/influxdata/ifql/issues/294) Remove concept of Kind from table columns
+
 ##### Count
 
 Count is an aggregate operation.
 For each aggregated column, it outputs the number of non null records as an integer.
-
 
 ##### Mean
 
@@ -798,6 +828,8 @@ All selector operations have the following properties:
 * `timeValue` string
     timeValue specifies which time value to use on the selected record.
     The value must be the label of a column that exists on the input table.
+
+[IMPL#294](https://github.com/influxdata/ifql/issues/294) Remove concept of Kind from table columns
 
 ##### First
 
@@ -883,8 +915,8 @@ Each input tables records are filtered to contain only records that exist within
 Each input table's partition key value is modified to fit within the time bounds.
 Tables where all records exists outside the time bounds are filtered entirely.
 
-TODO(nathanielc): is there a way to make range default to aligned times so that you do not get incomplete windows?
-Or maybe helper function for that purpose?
+
+[IMPL#321](https://github.com/influxdata/ifql/issues/321) Update range to default to aligned window ranges.
 
 Range has the following properties:
 
@@ -934,9 +966,6 @@ Group has the following properties:
 *  `keep` list of strings
     Keep specific columns that were not in the `by` columns.
     These columns will not be part of the table partition key, but will be present on the table.
-    TODO(nathanielc): Does it make sense to keep all columns?
-    If we want to remove columns should that be an explicit separate operation?
-    I think it simplifies the group behavior
 *  `except` list of strings
     Group by all other column except this list of columns.
     Cannot be used with `by`.
@@ -948,6 +977,7 @@ Examples:
     group(by:[]) // group all records into a single partition
     group(except:[]) // group records into all unique partitions
 
+[IMPL#322](https://github.com/influxdata/ifql/issues/322) Investigate always keeping all columns in group.
 
 #### Window
 
@@ -976,9 +1006,11 @@ Window has the following properties:
 * `stopCol` string
     Name of the column containing the window stop time. Defaults to `_stop`.
 
+[IMPL#319](https://github.com/influxdata/ifql/issues/319) Remove concept of Bounds from tables
+
 #### Collate
 
-TODO(nathanielc): Need a simple function to collapse fields into same table.
+[IMPL#323](https://github.com/influxdata/ifql/issues/323) Add function that makes it easy to get all fields as columns given a set of tags.
 
 #### Join
 
@@ -1081,6 +1113,9 @@ The function `toUInt` is defined as `toUInt = (table=<-) => table |> map(fn:(r) 
 If you need to convert other columns use the `map` function directly with the `uint` function.
 
 
+[IMPL#324](https://github.com/influxdata/ifql/issues/324) Update specification around type conversion functions.
+
+
 ### Composite data types
 
 A composite data type is a collection of primitive data types that together have a higher meaning.
@@ -1089,6 +1124,8 @@ A composite data type is a collection of primitive data types that together have
 
 Histogram is a composite type that represents a discrete cumulative distribution.
 Given a histogram with N buckets there will be N columns with the label `le_X` where `X` is replaced with the upper bucket boundary.
+
+[IMPL#325](https://github.com/influxdata/ifql/issues/325) Add support for a histogram composite data type.
 
 ### Triggers
 
@@ -1111,9 +1148,9 @@ Once a trigger is finished, its associated table is deleted.
 
 Currently all tables use an _after watermark_ trigger which fires only once the watermark has exceeded the `_stop` value of the table and then is immediately finished.
 
-TODO(nathanielc): This treats the `_stop` column as special, we need to allow for users to define the trigger incase they do not have a `_stop` column.
-
 Data sources are responsible for informing about updates to the watermark.
+
+[IMPL#326](https://github.com/influxdata/ifql/issues/326) Make trigger support not dependent on specific columns
 
 ### Execution model
 
@@ -1137,6 +1174,7 @@ When submitting a query specification directly the `Content-Type` header is used
 The result of a query is any number of named streams.
 As a stream consists of multiple tables each table is encoded as CSV textual data.
 CSV data should be encoded using UTF-8, and should be in Unicode Normal Form C as defined in [UAX15](https://www.w3.org/TR/2015/REC-tabular-data-model-20151217/#bib-UAX15).
+Line endings must be CRLF as defined by the `text/csv` MIME type in RFC 4180
 
 Before each table there are two header rows.
 The first declares the data types of each column, the second declares the column labels.
@@ -1191,6 +1229,4 @@ Example error encoding:
     ,Failed to parse query,897
 
 
-TODO Do we want to be compliant with the `text/csv` MIME type? https://tools.ietf.org/html/rfc4180 That specification requires that we use CRLF line endings.
-Also this standard allows LF line endings and acknowledges that its not technically compliant https://www.w3.org/TR/tabular-data-model/ with `text/csv`.
-
+[IMPL#327](https://github.com/influxdata/ifql/issues/327) Finalize csv encoding specification
