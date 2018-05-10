@@ -74,15 +74,17 @@ func compile(n semantic.Node, builtIns Scope) (Evaluator, error) {
 		}, nil
 	case *semantic.ObjectExpression:
 		properties := make(map[string]Evaluator, len(n.Properties))
+		propertyTypes := make(map[string]semantic.Type, len(n.Properties))
 		for _, p := range n.Properties {
 			node, err := compile(p.Value, builtIns)
 			if err != nil {
 				return nil, err
 			}
 			properties[p.Key.Name] = node
+			propertyTypes[p.Key.Name] = node.Type()
 		}
 		return &objEvaluator{
-			t:          n.Type(),
+			t:          semantic.NewObjectType(propertyTypes),
 			properties: properties,
 		}, nil
 	case *semantic.IdentifierExpression:
