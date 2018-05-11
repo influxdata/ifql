@@ -3,14 +3,18 @@ package functions
 import (
 	"fmt"
 
+	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
+	"github.com/influxdata/ifql/semantic"
 )
 
 const CumulativeSumKind = "cumulativeSum"
 
-type CumulativeSumOpSpec struct{}
+type CumulativeSumOpSpec struct {
+	Columns []string `json:"columns"`
+}
 
 var cumulativeSumSignature = query.DefaultFunctionSignature()
 
@@ -27,6 +31,17 @@ func createCumulativeSumOpSpec(args query.Arguments, a *query.Administration) (q
 	}
 
 	spec := new(CumulativeSumOpSpec)
+	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
+		return nil, err
+	} else if ok {
+		columns, err := interpreter.ToStringArray(cols)
+		if err != nil {
+			return nil, err
+		}
+		spec.Columns = columns
+	} else {
+		spec.Columns = []string{execute.DefaultValueColLabel}
+	}
 	return spec, nil
 }
 
@@ -38,15 +53,19 @@ func (s *CumulativeSumOpSpec) Kind() query.OperationKind {
 	return CumulativeSumKind
 }
 
-type CumulativeSumProcedureSpec struct{}
+type CumulativeSumProcedureSpec struct {
+	Columns []string
+}
 
 func newCumulativeSumProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
-	_, ok := qs.(*CumulativeSumOpSpec)
+	spec, ok := qs.(*CumulativeSumOpSpec)
 	if !ok {
 		return nil, fmt.Errorf("invalid spec type %T", qs)
 	}
 
-	return &CumulativeSumProcedureSpec{}, nil
+	return &CumulativeSumProcedureSpec{
+		Columns: spec.Columns,
+	}, nil
 }
 
 func (s *CumulativeSumProcedureSpec) Kind() plan.ProcedureKind {
@@ -55,6 +74,10 @@ func (s *CumulativeSumProcedureSpec) Kind() plan.ProcedureKind {
 func (s *CumulativeSumProcedureSpec) Copy() plan.ProcedureSpec {
 	ns := new(CumulativeSumProcedureSpec)
 	*ns = *s
+	if s.Columns != nil {
+		ns.Columns = make([]string, len(s.Columns))
+		copy(ns.Columns, s.Columns)
+	}
 	return ns
 }
 
@@ -72,55 +95,76 @@ func createCumulativeSumTransformation(id execute.DatasetID, mode execute.Accumu
 type cumulativeSumTransformation struct {
 	d     execute.Dataset
 	cache execute.BlockBuilderCache
+	spec  CumulativeSumProcedureSpec
 }
 
 func NewCumulativeSumTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *CumulativeSumProcedureSpec) *cumulativeSumTransformation {
 	return &cumulativeSumTransformation{
 		d:     d,
 		cache: cache,
+		spec:  *spec,
 	}
 }
 
-func (t *cumulativeSumTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *cumulativeSumTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *cumulativeSumTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	builder, new := t.cache.BlockBuilder(b)
-	if new {
-		execute.AddBlockCols(b, builder)
+	if !new {
+		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
-	columns := b.Cols()
-	cumulativeSums := cumulativeSumSlice(columns)
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i, _ := range ts {
-			for j, c := range columns {
-				switch c.Kind {
-				case execute.TimeColKind:
-					builder.AppendTime(j, rr.AtTime(i, j))
-				case execute.ValueColKind:
-					switch c.Type {
-					case execute.TInt:
-						cumSum := cumulativeSums[j].addInt(rr.AtInt(i, j))
-						builder.AppendInt(j, cumSum)
-					case execute.TUInt:
-						cumSum := cumulativeSums[j].addUInt(rr.AtUInt(i, j))
-						builder.AppendUInt(j, cumSum)
-					case execute.TFloat:
-						cumSum := cumulativeSums[j].addFloat(rr.AtFloat(i, j))
-						builder.AppendFloat(j, cumSum)
-					case execute.TBool:
-						builder.AppendBool(j, rr.AtBool(i, j))
-					case execute.TString:
-						builder.AppendString(j, rr.AtString(i, j))
-					}
-				case execute.TagColKind:
-					builder.AppendString(j, rr.AtString(i, j))
-				}
+	execute.AddBlockCols(b, builder)
+
+	cols := b.Cols()
+	sumers := make([]*cumulativeSum, len(cols))
+	for j, c := range cols {
+		for _, label := range t.spec.Columns {
+			if c.Label == label {
+				sumers[j] = &cumulativeSum{}
+				break
 			}
 		}
+	}
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for j, c := range cols {
+			switch c.Type {
+			case execute.TBool:
+				builder.AppendBools(j, cr.Bools(j))
+			case execute.TInt:
+				if sumers[j] != nil {
+					for i := 0; i < l; i++ {
+						builder.AppendInt(j, sumers[j].sumInt(cr.Ints(j)[i]))
+					}
+				} else {
+					builder.AppendInts(j, cr.Ints(j))
+				}
+			case execute.TUInt:
+				if sumers[j] != nil {
+					for i := 0; i < l; i++ {
+						builder.AppendUInt(j, sumers[j].sumUInt(cr.UInts(j)[i]))
+					}
+				} else {
+					builder.AppendUInts(j, cr.UInts(j))
+				}
+			case execute.TFloat:
+				if sumers[j] != nil {
+					for i := 0; i < l; i++ {
+						builder.AppendFloat(j, sumers[j].sumFloat(cr.Floats(j)[i]))
+					}
+				} else {
+					builder.AppendFloats(j, cr.Floats(j))
+				}
+			case execute.TString:
+				builder.AppendStrings(j, cr.Strings(j))
+			case execute.TTime:
+				builder.AppendTimes(j, cr.Times(j))
+			}
+		}
+		return nil
 	})
-	return nil
 }
 
 func (t *cumulativeSumTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {
@@ -139,25 +183,17 @@ type cumulativeSum struct {
 	floatVal float64
 }
 
-func (cumSum *cumulativeSum) addInt(val int64) int64 {
-	cumSum.intVal += val
-	return cumSum.intVal
+func (s *cumulativeSum) sumInt(val int64) int64 {
+	s.intVal += val
+	return s.intVal
 }
 
-func (cumSum *cumulativeSum) addUInt(val uint64) uint64 {
-	cumSum.uintVal += val
-	return cumSum.uintVal
+func (s *cumulativeSum) sumUInt(val uint64) uint64 {
+	s.uintVal += val
+	return s.uintVal
 }
 
-func (cumSum *cumulativeSum) addFloat(val float64) float64 {
-	cumSum.floatVal += val
-	return cumSum.floatVal
-}
-
-func cumulativeSumSlice(columns []execute.ColMeta) []*cumulativeSum {
-	sumSlice := make([]*cumulativeSum, len(columns))
-	for j, _ := range columns {
-		sumSlice[j] = &cumulativeSum{}
-	}
-	return sumSlice
+func (s *cumulativeSum) sumFloat(val float64) float64 {
+	s.floatVal += val
+	return s.floatVal
 }

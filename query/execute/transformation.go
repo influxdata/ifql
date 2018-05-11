@@ -9,7 +9,7 @@ import (
 )
 
 type Transformation interface {
-	RetractBlock(id DatasetID, meta BlockMetadata) error
+	RetractBlock(id DatasetID, key PartitionKey) error
 	Process(id DatasetID, b Block) error
 	UpdateWatermark(id DatasetID, t Time) error
 	UpdateProcessingTime(id DatasetID, t Time) error

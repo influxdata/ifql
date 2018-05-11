@@ -52,15 +52,15 @@ func (t *consecutiveTransport) Finished() <-chan struct{} {
 	return t.finished
 }
 
-func (t *consecutiveTransport) RetractBlock(id DatasetID, meta BlockMetadata) error {
+func (t *consecutiveTransport) RetractBlock(id DatasetID, key PartitionKey) error {
 	select {
 	case <-t.finished:
 		return t.err()
 	default:
 	}
 	t.pushMsg(&retractBlockMsg{
-		srcMessage:    srcMessage(id),
-		blockMetadata: meta,
+		srcMessage: srcMessage(id),
+		key:        key,
 	})
 	return nil
 }
@@ -191,7 +191,7 @@ PROCESS:
 func processMessage(t Transformation, m Message) (finished bool, err error) {
 	switch m := m.(type) {
 	case RetractBlockMsg:
-		err = t.RetractBlock(m.SrcDatasetID(), m.BlockMetadata())
+		err = t.RetractBlock(m.SrcDatasetID(), m.Key())
 	case ProcessMsg:
 		b := m.Block()
 		err = t.Process(m.SrcDatasetID(), b)
@@ -230,19 +230,19 @@ func (m srcMessage) SrcDatasetID() DatasetID {
 
 type RetractBlockMsg interface {
 	Message
-	BlockMetadata() BlockMetadata
+	Key() PartitionKey
 }
 
 type retractBlockMsg struct {
 	srcMessage
-	blockMetadata BlockMetadata
+	key PartitionKey
 }
 
 func (m *retractBlockMsg) Type() MessageType {
 	return RetractBlockType
 }
-func (m *retractBlockMsg) BlockMetadata() BlockMetadata {
-	return m.blockMetadata
+func (m *retractBlockMsg) Key() PartitionKey {
+	return m.key
 }
 
 type ProcessMsg interface {

@@ -104,17 +104,21 @@ func NewDistinctTransformation(d execute.Dataset, cache execute.BlockBuilderCach
 	}
 }
 
-func (t *distinctTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *distinctTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *distinctTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	builder, new := t.cache.BlockBuilder(b)
-	if new {
-		execute.AddBlockCols(b, builder)
+	if !new {
+		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
+	execute.AddBlockCols(b, builder)
 
 	colIdx := execute.ColIdx(t.column, builder.Cols())
+	if colIdx < 0 {
+		return fmt.Errorf("no column %q exists", t.column)
+	}
 	col := builder.Cols()[colIdx]
 
 	var (
@@ -141,73 +145,53 @@ func (t *distinctTransformation) Process(id execute.DatasetID, b execute.Block) 
 	}
 
 	cols := builder.Cols()
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i := range ts {
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for i := 0; i < l; i++ {
 			// Check distinct
 			switch col.Type {
 			case execute.TBool:
-				v := rr.AtBool(i, colIdx)
+				v := cr.Bools(colIdx)[i]
 				if boolDistinct[v] {
 					continue
 				}
 				boolDistinct[v] = true
 			case execute.TInt:
-				v := rr.AtInt(i, colIdx)
+				v := cr.Ints(colIdx)[i]
 				if intDistinct[v] {
 					continue
 				}
 				intDistinct[v] = true
 			case execute.TUInt:
-				v := rr.AtUInt(i, colIdx)
+				v := cr.UInts(colIdx)[i]
 				if uintDistinct[v] {
 					continue
 				}
 				uintDistinct[v] = true
 			case execute.TFloat:
-				v := rr.AtFloat(i, colIdx)
+				v := cr.Floats(colIdx)[i]
 				if floatDistinct[v] {
 					continue
 				}
 				floatDistinct[v] = true
 			case execute.TString:
-				v := rr.AtString(i, colIdx)
+				v := cr.Strings(colIdx)[i]
 				if stringDistinct[v] {
 					continue
 				}
 				stringDistinct[v] = true
 			case execute.TTime:
-				v := rr.AtTime(i, colIdx)
+				v := cr.Times(colIdx)[i]
 				if timeDistinct[v] {
 					continue
 				}
 				timeDistinct[v] = true
 			}
 
-			for j, c := range cols {
-				if c.Common {
-					continue
-				}
-				switch c.Type {
-				case execute.TBool:
-					builder.AppendBool(j, rr.AtBool(i, j))
-				case execute.TInt:
-					builder.AppendInt(j, rr.AtInt(i, j))
-				case execute.TUInt:
-					builder.AppendUInt(j, rr.AtUInt(i, j))
-				case execute.TFloat:
-					builder.AppendFloat(j, rr.AtFloat(i, j))
-				case execute.TString:
-					builder.AppendString(j, rr.AtString(i, j))
-				case execute.TTime:
-					builder.AppendTime(j, rr.AtTime(i, j))
-				default:
-					execute.PanicUnknownType(c.Type)
-				}
-			}
+			execute.AppendRecord(i, cr, builder)
 		}
+		return nil
 	})
-
-	return nil
 }
 
 func (t *distinctTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {

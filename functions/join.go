@@ -226,15 +226,16 @@ type mergeJoinParentState struct {
 	finished   bool
 }
 
-func (t *mergeJoinTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
+func (t *mergeJoinTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	panic("not implemented")
+	//t.mu.Lock()
+	//defer t.mu.Unlock()
 
-	bm := blockMetadata{
-		tags:   meta.Tags().IntersectingSubset(t.keys),
-		bounds: meta.Bounds(),
-	}
-	return t.d.RetractBlock(execute.ToBlockKey(bm))
+	//bm := blockMetadata{
+	//	tags:   meta.Tags().IntersectingSubset(t.keys),
+	//	bounds: meta.Bounds(),
+	//}
+	//return t.d.RetractBlock(execute.ToBlockKey(bm))
 }
 
 func (t *mergeJoinTransformation) Process(id execute.DatasetID, b execute.Block) error {
@@ -358,7 +359,7 @@ func (t *mergeJoinTransformation) Finish(id execute.DatasetID, err error) {
 }
 
 type MergeJoinCache interface {
-	Tables(execute.BlockMetadata) *joinTables
+	Tables(execute.PartitionKey) *joinTables
 }
 
 type mergeJoinCache struct {

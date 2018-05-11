@@ -106,8 +106,8 @@ func NewIntegralTransformation(d execute.Dataset, cache execute.BlockBuilderCach
 	}
 }
 
-func (t *integralTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *integralTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) error {

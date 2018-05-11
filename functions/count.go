@@ -29,7 +29,7 @@ func createCountOpSpec(args query.Arguments, a *query.Administration) (query.Ope
 	}
 	s := new(CountOpSpec)
 	if err := s.AggregateConfig.ReadArgs(args); err != nil {
-		return s, err
+		return nil, err
 	}
 	return s, nil
 }

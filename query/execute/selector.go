@@ -70,9 +70,8 @@ func newSelectorTransformation(d Dataset, c BlockBuilderCache, config SelectorCo
 	}
 }
 
-func (t *selectorTransformation) RetractBlock(id DatasetID, meta BlockMetadata) error {
+func (t *selectorTransformation) RetractBlock(id DatasetID, key PartitionKey) error {
 	//TODO(nathanielc): Store intermediate state for retractions
-	key := ToBlockKey(meta)
 	return t.d.RetractBlock(key)
 }
 func (t *selectorTransformation) UpdateWatermark(id DatasetID, mark Time) error {
@@ -86,7 +85,7 @@ func (t *selectorTransformation) Finish(id DatasetID, err error) {
 }
 
 func (t *selectorTransformation) setupBuilder(b Block) (BlockBuilder, int, error) {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
 		return nil, 0, fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}

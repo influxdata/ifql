@@ -23,6 +23,15 @@ type AggregateConfig struct {
 	TimeCol   string   `json:"time_col"`
 }
 
+func (c AggregateConfig) Copy() AggregateConfig {
+	nc := c
+	if c.Columns != nil {
+		nc.Columns = make([]string, len(c.Columns))
+		copy(nc.Columns, c.Columns)
+	}
+	return nc
+}
+
 func (c *AggregateConfig) ReadArgs(args query.Arguments) error {
 	if timeCol, ok, err := args.GetString("timeCol"); err != nil {
 		return err
@@ -69,18 +78,18 @@ func NewAggregateTransformationAndDataset(id DatasetID, mode AccumulationMode, a
 	return NewAggregateTransformation(d, cache, agg, config), d
 }
 
-func (t *aggregateTransformation) RetractBlock(id DatasetID, meta BlockMetadata) error {
+func (t *aggregateTransformation) RetractBlock(id DatasetID, key PartitionKey) error {
 	//TODO(nathanielc): Store intermediate state for retractions
-	key := ToBlockKey(meta)
 	return t.d.RetractBlock(key)
 }
 
 func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
 
+	builder.AddCol(TimeCol)
 	AddBlockKeyCols(b, builder)
 
 	builderColMap := make([]int, len(t.config.Columns))
@@ -127,15 +136,15 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 	}
 
 	// Add row for aggregate values
-	timeIdx := ColIdx(t.config.TimeValue, cols)
+	timeIdx := ColIdx(t.config.TimeValue, b.Key().Cols())
 	if timeIdx < 0 {
 		return fmt.Errorf("timeValue column %q does not exist", t.config.TimeValue)
 	}
-	timeCol := cols[timeIdx]
+	timeCol := b.Key().Cols()[timeIdx]
 	if timeCol.Type != TTime {
 		return fmt.Errorf("timeValue column %q does not have type time", t.config.TimeValue)
 	}
-	builder.AppendTime(timeIdx, b.Key().ValueTime(t.config.TimeValue))
+	builder.AppendTime(0, b.Key().ValueTime(timeIdx))
 
 	b.Do(func(cr ColReader) error {
 		for j := range t.config.Columns {

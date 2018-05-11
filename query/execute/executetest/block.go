@@ -7,7 +7,6 @@ import (
 )
 
 type Block struct {
-	Bnds    execute.Bounds
 	ColMeta []execute.ColMeta
 	// Data is a list of rows, i.e. Data[row][col]
 	// Each row must be a list with length equal to len(ColMeta)
@@ -15,10 +14,6 @@ type Block struct {
 }
 
 func (b *Block) RefCount(n int) {}
-
-func (b *Block) Bounds() execute.Bounds {
-	return b.Bnds
-}
 
 func (b *Block) Cols() []execute.ColMeta {
 	return b.ColMeta
@@ -79,7 +74,7 @@ func (cr ColReader) Times(j int) []execute.Time {
 
 func BlocksFromCache(c execute.DataCache) []*Block {
 	var blocks []*Block
-	c.ForEach(func(key execute.BlockKey) {
+	c.ForEach(func(key execute.PartitionKey) {
 		b, err := c.Block(key)
 		if err != nil {
 			panic(err)
@@ -91,7 +86,6 @@ func BlocksFromCache(c execute.DataCache) []*Block {
 
 func ConvertBlock(b execute.Block) *Block {
 	blk := &Block{
-		Bnds:    b.Bounds(),
 		ColMeta: b.Cols(),
 	}
 
@@ -133,13 +127,14 @@ func (b SortedBlocks) Len() int {
 }
 
 func (b SortedBlocks) Less(i int, j int) bool {
-	if b[i].Bnds.Stop == b[j].Bnds.Stop {
-		if b[i].Bnds.Start == b[j].Bnds.Start {
-			return b[i].Key().String() < b[j].Key().String()
-		}
-		return b[i].Bnds.Start < b[j].Bnds.Start
-	}
-	return b[i].Bnds.Stop < b[j].Bnds.Stop
+	panic("not implemented")
+	//	if b[i].Bnds.Stop == b[j].Bnds.Stop {
+	//		if b[i].Bnds.Start == b[j].Bnds.Start {
+	//			return b[i].Key().String() < b[j].Key().String()
+	//		}
+	//		return b[i].Bnds.Start < b[j].Bnds.Start
+	//	}
+	//	return b[i].Bnds.Stop < b[j].Bnds.Stop
 }
 
 func (b SortedBlocks) Swap(i int, j int) {

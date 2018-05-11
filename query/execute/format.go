@@ -100,9 +100,12 @@ func (f *Formatter) WriteTo(out io.Writer) (int64, error) {
 
 	// Write Block header
 	w.write([]byte("Block: keys: ["))
-	w.write([]byte(strings.Join(f.b.Key().Labels(), ", ")))
-	w.write([]byte("] bounds: "))
-	w.write([]byte(f.b.Bounds().String()))
+	labels := make([]string, len(f.b.Key().Cols()))
+	for i, c := range f.b.Key().Cols() {
+		labels[i] = c.Label
+	}
+	w.write([]byte(strings.Join(labels, ", ")))
+	w.write([]byte("]"))
 	w.write(eol)
 
 	// Check err and return early

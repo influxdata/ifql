@@ -2,11 +2,15 @@ package execute
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
+	"hash/fnv"
+	"math"
 	"sort"
 	"sync/atomic"
 
 	"github.com/influxdata/ifql/query"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -16,58 +20,104 @@ const (
 	DefaultValueColLabel = "_value"
 )
 
-type BlockMetadata interface {
-	Bounds() Bounds
-	Key() PartitionKey
-}
-
-type BlockKey string
-
-func ToBlockKey(meta BlockMetadata) BlockKey {
-	// TODO: Make this not a hack
-	return BlockKey(fmt.Sprintf("%s:%d-%d", meta.Key().String(), meta.Bounds().Start, meta.Bounds().Stop))
+var TimeCol = ColMeta{
+	Label: DefaultTimeColLabel,
+	Type:  TTime,
 }
 
 type PartitionKey interface {
-	Labels() []string
-	ValueBool(label string) bool
-	ValueUInt(label string) uint64
-	ValueInt(label string) int64
-	ValueFloat(label string) float64
-	ValueString(label string) string
-	ValueDuration(label string) Duration
-	ValueTime(label string) Time
+	Cols() []ColMeta
+
+	ValueBool(j int) bool
+	ValueUInt(j int) uint64
+	ValueInt(j int) int64
+	ValueFloat(j int) float64
+	ValueString(j int) string
+	ValueDuration(j int) Duration
+	ValueTime(j int) Time
+
+	Hash() uint64
 	String() string
 }
 
-type partitionKey struct {
-	labels []string
-	values map[string]interface{}
+func PartitionKeyCompare(a, b PartitionKey) bool {
+	aCols := a.Cols()
+	bCols := b.Cols()
+	if len(aCols) != len(bCols) {
+		return false
+	}
+	for j, c := range aCols {
+		if aCols[j] != bCols[j] {
+			return false
+		}
+		switch c.Type {
+		case TBool:
+			if a.ValueBool(j) != b.ValueBool(j) {
+				return false
+			}
+		case TInt:
+			if a.ValueInt(j) != b.ValueInt(j) {
+				return false
+			}
+		case TUInt:
+			if a.ValueUInt(j) != b.ValueUInt(j) {
+				return false
+			}
+		case TFloat:
+			if a.ValueFloat(j) != b.ValueFloat(j) {
+				return false
+			}
+		case TString:
+			if a.ValueString(j) != b.ValueString(j) {
+				return false
+			}
+		case TTime:
+			if a.ValueTime(j) != b.ValueTime(j) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
-func (k partitionKey) Labels() []string {
-	return k.labels
+type partitionKey struct {
+	cols    []ColMeta
+	values  []interface{}
+	hasHash bool
+	hash    uint64
 }
-func (k partitionKey) ValueBool(label string) bool {
-	return k.values[label].(bool)
+
+func (k *partitionKey) Cols() []ColMeta {
+	return k.cols
 }
-func (k partitionKey) ValueUInt(label string) uint64 {
-	return k.values[label].(uint64)
+func (k *partitionKey) ValueBool(j int) bool {
+	return k.values[j].(bool)
 }
-func (k partitionKey) ValueInt(label string) int64 {
-	return k.values[label].(int64)
+func (k *partitionKey) ValueUInt(j int) uint64 {
+	return k.values[j].(uint64)
 }
-func (k partitionKey) ValueFloat(label string) float64 {
-	return k.values[label].(float64)
+func (k *partitionKey) ValueInt(j int) int64 {
+	return k.values[j].(int64)
 }
-func (k partitionKey) ValueString(label string) string {
-	return k.values[label].(string)
+func (k *partitionKey) ValueFloat(j int) float64 {
+	return k.values[j].(float64)
 }
-func (k partitionKey) ValueDuration(label string) Duration {
-	return k.values[label].(Duration)
+func (k *partitionKey) ValueString(j int) string {
+	return k.values[j].(string)
 }
-func (k partitionKey) ValueTime(label string) Time {
-	return k.values[label].(Time)
+func (k *partitionKey) ValueDuration(j int) Duration {
+	return k.values[j].(Duration)
+}
+func (k *partitionKey) ValueTime(j int) Time {
+	return k.values[j].(Time)
+}
+
+func (k *partitionKey) Hash() uint64 {
+	if !k.hasHash {
+		k.hasHash = true
+		k.hash = computeKeyHash(k)
+	}
+	return k.hash
 }
 
 func (k partitionKey) String() string {
@@ -75,7 +125,7 @@ func (k partitionKey) String() string {
 }
 
 type Block interface {
-	BlockMetadata
+	Key() PartitionKey
 
 	Cols() []ColMeta
 
@@ -109,7 +159,6 @@ func CacheOneTimeBlock(b Block, a *Allocator) Block {
 // CopyBlock returns a copy of the block and is OneTimeBlock safe.
 func CopyBlock(b Block, a *Allocator) Block {
 	builder := NewColListBlockBuilder(a)
-	builder.SetBounds(b.Bounds())
 
 	cols := b.Cols()
 	colMap := make([]int, len(cols))
@@ -211,6 +260,30 @@ func AppendBlock(b Block, builder BlockBuilder, colMap []int) {
 	})
 }
 
+func AppendRecord(i int, cr ColReader, builder BlockBuilder) {
+	for j, c := range builder.Cols() {
+		if c.Common {
+			continue
+		}
+		switch c.Type {
+		case TBool:
+			builder.AppendBool(j, cr.Bools(j)[i])
+		case TInt:
+			builder.AppendInt(j, cr.Ints(j)[i])
+		case TUInt:
+			builder.AppendUInt(j, cr.UInts(j)[i])
+		case TFloat:
+			builder.AppendFloat(j, cr.Floats(j)[i])
+		case TString:
+			builder.AppendString(j, cr.Strings(j)[i])
+		case TTime:
+			builder.AppendTime(j, cr.Times(j)[i])
+		default:
+			PanicUnknownType(c.Type)
+		}
+	}
+}
+
 // AddTags add columns to the builder for the given tags.
 // It is assumed that all tags are common to all rows of this block.
 func AddTags(t Tags, b BlockBuilder) {
@@ -252,7 +325,7 @@ func ColIdx(label string, cols []ColMeta) int {
 type BlockBuilder interface {
 	SetBounds(Bounds)
 
-	BlockMetadata
+	Key() PartitionKey
 
 	NRows() int
 	NCols() int
@@ -455,7 +528,6 @@ func (m blockMetadata) Bounds() Bounds {
 
 type ColListBlockBuilder struct {
 	blk   *ColListBlock
-	key   BlockKey
 	alloc *Allocator
 }
 
@@ -1059,12 +1131,12 @@ func (c *commonStrColumn) Swap(i, j int) {}
 type BlockBuilderCache interface {
 	// BlockBuilder returns an existing or new BlockBuilder for the given meta data.
 	// The boolean return value indicates if BlockBuilder is new.
-	BlockBuilder(meta BlockMetadata) (BlockBuilder, bool)
-	ForEachBuilder(f func(BlockKey, BlockBuilder))
+	BlockBuilder(key PartitionKey) (BlockBuilder, bool)
+	ForEachBuilder(f func(PartitionKey, BlockBuilder))
 }
 
 type blockBuilderCache struct {
-	blocks map[BlockKey]blockState
+	blocks map[uint64][]blockState
 	alloc  *Allocator
 
 	triggerSpec query.TriggerSpec
@@ -1072,12 +1144,13 @@ type blockBuilderCache struct {
 
 func NewBlockBuilderCache(a *Allocator) *blockBuilderCache {
 	return &blockBuilderCache{
-		blocks: make(map[BlockKey]blockState),
+		blocks: make(map[uint64][]blockState),
 		alloc:  a,
 	}
 }
 
 type blockState struct {
+	key     PartitionKey
 	builder BlockBuilder
 	trigger Trigger
 }
@@ -1086,56 +1159,112 @@ func (d *blockBuilderCache) SetTriggerSpec(ts query.TriggerSpec) {
 	d.triggerSpec = ts
 }
 
-func (d *blockBuilderCache) Block(key BlockKey) (Block, error) {
-	return d.blocks[key].builder.Block()
+func (d *blockBuilderCache) Block(key PartitionKey) (Block, error) {
+	b, ok := d.lookupState(key)
+	if !ok {
+		return nil, errors.New("block not found")
+	}
+	return b.builder.Block()
 }
-func (d *blockBuilderCache) BlockMetadata(key BlockKey) BlockMetadata {
-	return d.blocks[key].builder
+
+func computeKeyHash(key PartitionKey) uint64 {
+	h := fnv.New64()
+	for j, c := range key.Cols() {
+		h.Write([]byte(c.Label))
+		switch c.Type {
+		case TBool:
+			if key.ValueBool(j) {
+				h.Write([]byte{1})
+			} else {
+				h.Write([]byte{0})
+			}
+		case TInt:
+			binary.Write(h, binary.BigEndian, key.ValueInt(j))
+		case TUInt:
+			binary.Write(h, binary.BigEndian, key.ValueUInt(j))
+		case TFloat:
+			binary.Write(h, binary.BigEndian, math.Float64bits(key.ValueFloat(j)))
+		case TString:
+			h.Write([]byte(key.ValueString(j)))
+		case TTime:
+			binary.Write(h, binary.BigEndian, uint64(key.ValueTime(j)))
+		}
+	}
+	return h.Sum64()
 }
 
 // BlockBuilder will return the builder for the specified block.
 // If no builder exists, one will be created.
-func (d *blockBuilderCache) BlockBuilder(meta BlockMetadata) (BlockBuilder, bool) {
-	key := ToBlockKey(meta)
-	b, ok := d.blocks[key]
+func (d *blockBuilderCache) BlockBuilder(key PartitionKey) (BlockBuilder, bool) {
+	b, ok := d.lookupState(key)
 	if !ok {
 		builder := NewColListBlockBuilder(d.alloc)
-		builder.SetBounds(meta.Bounds())
 		t := NewTriggerFromSpec(d.triggerSpec)
 		b = blockState{
+			key:     key,
 			builder: builder,
 			trigger: t,
 		}
-		d.blocks[key] = b
+		d.blocks[key.Hash()] = append(d.blocks[key.Hash()], b)
 	}
 	return b.builder, !ok
 }
 
-func (d *blockBuilderCache) ForEachBuilder(f func(BlockKey, BlockBuilder)) {
-	for k, b := range d.blocks {
-		f(k, b.builder)
+func (d *blockBuilderCache) lookupState(key PartitionKey) (blockState, bool) {
+	h := key.Hash()
+	bs, ok := d.blocks[h]
+	if !ok {
+		return blockState{}, false
+	}
+	if len(bs) == 1 {
+		return bs[0], false
+	}
+	for _, b := range bs {
+		if PartitionKeyCompare(b.key, key) {
+			return b, false
+		}
+	}
+	return blockState{}, false
+}
+
+func (d *blockBuilderCache) ForEachBuilder(f func(PartitionKey, BlockBuilder)) {
+	for _, bs := range d.blocks {
+		for _, b := range bs {
+			f(b.key, b.builder)
+		}
 	}
 }
 
-func (d *blockBuilderCache) DiscardBlock(key BlockKey) {
-	d.blocks[key].builder.ClearData()
+func (d *blockBuilderCache) DiscardBlock(key PartitionKey) {
+	b, ok := d.lookupState(key)
+	if ok {
+		b.builder.ClearData()
+	}
 }
-func (d *blockBuilderCache) ExpireBlock(key BlockKey) {
-	d.blocks[key].builder.ClearData()
-	delete(d.blocks, key)
-}
-
-func (d *blockBuilderCache) ForEach(f func(BlockKey)) {
-	for bk := range d.blocks {
-		f(bk)
+func (d *blockBuilderCache) ExpireBlock(key PartitionKey) {
+	b, ok := d.lookupState(key)
+	if ok {
+		b.builder.ClearData()
+		panic("not implemented")
+		//delete(d.blocks, key)
 	}
 }
 
-func (d *blockBuilderCache) ForEachWithContext(f func(BlockKey, Trigger, BlockContext)) {
-	for bk, b := range d.blocks {
-		f(bk, b.trigger, BlockContext{
-			Bounds: b.builder.Bounds(),
-			Count:  b.builder.NRows(),
-		})
+func (d *blockBuilderCache) ForEach(f func(PartitionKey)) {
+	for _, bs := range d.blocks {
+		for _, b := range bs {
+			f(b.key)
+		}
+	}
+}
+
+func (d *blockBuilderCache) ForEachWithContext(f func(PartitionKey, Trigger, BlockContext)) {
+	for _, bs := range d.blocks {
+		for _, b := range bs {
+			f(b.key, b.trigger, BlockContext{
+				Key:   b.key,
+				Count: b.builder.NRows(),
+			})
+		}
 	}
 }

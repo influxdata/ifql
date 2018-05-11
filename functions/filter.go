@@ -217,8 +217,8 @@ func NewFilterTransformation(d execute.Dataset, cache execute.BlockBuilderCache,
 	}, nil
 }
 
-func (t *filterTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *filterTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *filterTransformation) Process(id execute.DatasetID, b execute.Block) error {
@@ -235,39 +235,20 @@ func (t *filterTransformation) Process(id execute.DatasetID, b execute.Block) er
 	}
 
 	// Append only matching rows to block
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i := range ts {
-			if pass, err := t.fn.Eval(i, rr); err != nil {
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for i := 0; i < l; i++ {
+			if pass, err := t.fn.Eval(i, cr); err != nil {
 				log.Printf("failed to evaluate filter expression: %v", err)
 				continue
 			} else if !pass {
 				// No match, skipping
 				continue
 			}
-			for j, c := range cols {
-				if c.Common {
-					continue
-				}
-				switch c.Type {
-				case execute.TBool:
-					builder.AppendBool(j, rr.AtBool(i, j))
-				case execute.TInt:
-					builder.AppendInt(j, rr.AtInt(i, j))
-				case execute.TUInt:
-					builder.AppendUInt(j, rr.AtUInt(i, j))
-				case execute.TFloat:
-					builder.AppendFloat(j, rr.AtFloat(i, j))
-				case execute.TString:
-					builder.AppendString(j, rr.AtString(i, j))
-				case execute.TTime:
-					builder.AppendTime(j, rr.AtTime(i, j))
-				default:
-					execute.PanicUnknownType(c.Type)
-				}
-			}
+			execute.AppendRecord(i, cr, builder)
 		}
+		return nil
 	})
-	return nil
 }
 
 func (t *filterTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {

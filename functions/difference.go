@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
@@ -13,13 +14,15 @@ import (
 const DifferenceKind = "difference"
 
 type DifferenceOpSpec struct {
-	NonNegative bool `json:"non_negative"`
+	NonNegative bool     `json:"non_negative"`
+	Columns     []string `json:"columns"`
 }
 
 var differenceSignature = query.DefaultFunctionSignature()
 
 func init() {
 	differenceSignature.Params["nonNegative"] = semantic.Bool
+	derivativeSignature.Params["columns"] = semantic.NewArrayType(semantic.String)
 
 	query.RegisterFunction(DifferenceKind, createDifferenceOpSpec, differenceSignature)
 	query.RegisterOpSpec(DifferenceKind, newDifferenceOp)
@@ -45,6 +48,18 @@ func createDifferenceOpSpec(args query.Arguments, a *query.Administration) (quer
 		spec.NonNegative = nn
 	}
 
+	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
+		return nil, err
+	} else if ok {
+		columns, err := interpreter.ToStringArray(cols)
+		if err != nil {
+			return nil, err
+		}
+		spec.Columns = columns
+	} else {
+		spec.Columns = []string{execute.DefaultValueColLabel}
+	}
+
 	return spec, nil
 }
 
@@ -57,7 +72,8 @@ func (s *DifferenceOpSpec) Kind() query.OperationKind {
 }
 
 type DifferenceProcedureSpec struct {
-	NonNegative bool `json:"non_negative"`
+	NonNegative bool     `json:"non_negative"`
+	Columns     []string `json:"columns"`
 }
 
 func newDifferenceProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -68,6 +84,7 @@ func newDifferenceProcedure(qs query.OperationSpec, pa plan.Administration) (pla
 
 	return &DifferenceProcedureSpec{
 		NonNegative: spec.NonNegative,
+		Columns:     spec.Columns,
 	}, nil
 }
 
@@ -77,6 +94,10 @@ func (s *DifferenceProcedureSpec) Kind() plan.ProcedureKind {
 func (s *DifferenceProcedureSpec) Copy() plan.ProcedureSpec {
 	ns := new(DifferenceProcedureSpec)
 	*ns = *s
+	if s.Columns != nil {
+		ns.Columns = make([]string, len(s.Columns))
+		copy(ns.Columns, s.Columns)
+	}
 	return ns
 }
 
@@ -96,6 +117,7 @@ type differenceTransformation struct {
 	cache execute.BlockBuilderCache
 
 	nonNegative bool
+	columns     []string
 }
 
 func NewDifferenceTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *DifferenceProcedureSpec) *differenceTransformation {
@@ -103,89 +125,99 @@ func NewDifferenceTransformation(d execute.Dataset, cache execute.BlockBuilderCa
 		d:           d,
 		cache:       cache,
 		nonNegative: spec.NonNegative,
+		columns:     spec.Columns,
 	}
 }
 
-func (t *differenceTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *differenceTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *differenceTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	builder, new := t.cache.BlockBuilder(b)
-	if new {
-		cols := b.Cols()
-		for j, c := range cols {
-			switch c.Kind {
-			case execute.TimeColKind:
-				builder.AddCol(c)
-			case execute.TagColKind:
-				builder.AddCol(c)
-				if c.Common {
-					builder.SetCommonString(j, b.Tags()[c.Label])
-				}
-			case execute.ValueColKind:
-				var typ execute.DataType
-				switch c.Type {
-				case execute.TInt, execute.TUInt:
-					typ = execute.TInt
-				case execute.TFloat:
-					typ = execute.TFloat
-				}
-				builder.AddCol(execute.ColMeta{
-					Label: c.Label,
-					Kind:  execute.ValueColKind,
-					Type:  typ,
-				})
-			}
-		}
+	if !new {
+		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
 	cols := b.Cols()
 	differences := make([]*difference, len(cols))
 	for j, c := range cols {
-		if c.IsValue() {
-			d := newDifference(j, t.nonNegative)
-			differences[j] = d
+		found := false
+		for _, label := range t.columns {
+			if c.Label == label {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			var typ execute.DataType
+			switch c.Type {
+			case execute.TInt, execute.TUInt:
+				typ = execute.TInt
+			case execute.TFloat:
+				typ = execute.TFloat
+			}
+			builder.AddCol(execute.ColMeta{
+				Label: c.Label,
+				Type:  typ,
+			})
+			differences[j] = newDifference(j, t.nonNegative)
+		} else {
+			builder.AddCol(c)
 		}
 	}
 
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i := range ts {
-			include := false
-			for _, d := range differences {
-				if d == nil {
-					continue
-				}
-				var ok bool
-				j := d.col
-				switch cols[j].Type {
-				case execute.TInt:
-					ok = d.updateInt(rr.AtInt(i, j))
-				case execute.TUInt:
-					ok = d.updateUInt(rr.AtUInt(i, j))
-				case execute.TFloat:
-					ok = d.updateFloat(rr.AtFloat(i, j))
-				}
-				include = include || ok
-			}
-			if include {
-				for j, c := range builder.Cols() {
-					switch c.Kind {
-					case execute.TimeColKind:
-						builder.AppendTime(j, rr.AtTime(i, j))
-					case execute.TagColKind:
-						builder.AppendString(j, rr.AtString(i, j))
-					case execute.ValueColKind:
-						//TODO(nathanielc): Write null markers when we have support for null values.
-						switch c.Type {
-						case execute.TInt:
-							builder.AppendInt(j, differences[j].valueInt())
-						case execute.TFloat:
-							builder.AppendFloat(j, differences[j].valueFloat())
+	// We need to drop the first row since its derivative is undefined
+	firstIdx := 1
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for j, c := range cols {
+			d := differences[j]
+			switch c.Type {
+			case execute.TBool:
+				builder.AppendBools(j, cr.Bools(j)[firstIdx:])
+			case execute.TInt:
+				if d != nil {
+					for i := 0; i < l; i++ {
+						v := d.updateInt(cr.Ints(j)[i])
+						if i != 0 || firstIdx == 0 {
+							builder.AppendInt(j, v)
 						}
 					}
+				} else {
+					builder.AppendInts(j, cr.Ints(j)[firstIdx:])
 				}
+			case execute.TUInt:
+				if d != nil {
+					for i := 0; i < l; i++ {
+						v := d.updateUInt(cr.UInts(j)[i])
+						if i != 0 || firstIdx == 0 {
+							builder.AppendInt(j, v)
+						}
+					}
+				} else {
+					builder.AppendUInts(j, cr.UInts(j)[firstIdx:])
+				}
+			case execute.TFloat:
+				if d != nil {
+					for i := 0; i < l; i++ {
+						v := d.updateFloat(cr.Floats(j)[i])
+						if i != 0 || firstIdx == 0 {
+							builder.AppendFloat(j, v)
+						}
+					}
+				} else {
+					builder.AppendFloats(j, cr.Floats(j)[firstIdx:])
+				}
+			case execute.TString:
+				builder.AppendStrings(j, cr.Strings(j)[firstIdx:])
+			case execute.TTime:
+				builder.AppendTimes(j, cr.Times(j)[firstIdx:])
 			}
 		}
+		// Now that we skipped the first row, start at 0 for the rest of the batches
+		firstIdx = 0
+		return nil
 	})
 
 	return nil
@@ -217,75 +249,67 @@ type difference struct {
 	pIntValue   int64
 	pUIntValue  uint64
 	pFloatValue float64
-
-	diffInt   int64
-	diffFloat float64
 }
 
-func (d *difference) valueInt() int64 {
-	return d.diffInt
-}
-func (d *difference) valueFloat() float64 {
-	return d.diffFloat
-}
-
-func (d *difference) updateInt(v int64) bool {
+func (d *difference) updateInt(v int64) int64 {
 	if d.first {
 		d.pIntValue = v
 		d.first = false
-		d.diffInt = 0
-		return false
+		return 0
 	}
 
-	d.diffInt = v - d.pIntValue
+	diff := v - d.pIntValue
 
 	d.pIntValue = v
 
-	if d.nonNegative && d.diffInt < 0 {
-		d.diffInt = 0
-		return false
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Return null when we have null support
+		// Also see https://github.com/influxdata/ifql/issues/217
+		return 0
 	}
 
-	return true
+	return diff
 }
-func (d *difference) updateUInt(v uint64) bool {
+func (d *difference) updateUInt(v uint64) int64 {
 	if d.first {
 		d.pUIntValue = v
 		d.first = false
-		d.diffInt = 0
-		return false
+		return 0
 	}
 
+	var diff int64
 	if d.pUIntValue > v {
-		d.diffInt = int64(d.pUIntValue-v) * -1
+		// Prevent uint64 overflow by applying the negative sign after the conversion to an int64.
+		diff = int64(d.pUIntValue-v) * -1
 	} else {
-		d.diffInt = int64(v - d.pUIntValue)
+		diff = int64(v - d.pUIntValue)
 	}
 
 	d.pUIntValue = v
 
-	if d.nonNegative && d.diffInt < 0 {
-		d.diffInt = 0
-		return false
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Return null when we have null support
+		// Also see https://github.com/influxdata/ifql/issues/217
+		return 0
 	}
 
-	return true
+	return diff
 }
-func (d *difference) updateFloat(v float64) bool {
+func (d *difference) updateFloat(v float64) float64 {
 	if d.first {
 		d.pFloatValue = v
 		d.first = false
-		d.diffFloat = math.NaN()
-		return false
+		return math.NaN()
 	}
 
-	d.diffFloat = v - d.pFloatValue
+	diff := v - d.pFloatValue
 	d.pFloatValue = v
 
-	if d.nonNegative && d.diffFloat < 0 {
-		d.diffFloat = math.NaN()
-		return false
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Return null when we have null support
+		// Also see https://github.com/influxdata/ifql/issues/217
+		return math.NaN()
 	}
 
-	return true
+	return diff
 }

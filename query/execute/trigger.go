@@ -19,8 +19,8 @@ type TriggerContext struct {
 }
 
 type BlockContext struct {
-	Bounds Bounds
-	Count  int
+	Key   PartitionKey
+	Count int
 }
 
 func NewTriggerFromSpec(spec query.TriggerSpec) Trigger {
@@ -60,10 +60,12 @@ type afterWatermarkTrigger struct {
 }
 
 func (t *afterWatermarkTrigger) Triggered(c TriggerContext) bool {
-	if c.Watermark >= c.Block.Bounds.Stop+Time(t.allowedLateness) {
+	timeIdx := ColIdx(DefaultStopColLabel, c.Block.Key.Cols())
+	stop := c.Block.Key.ValueTime(timeIdx)
+	if c.Watermark >= stop+Time(t.allowedLateness) {
 		t.finished = true
 	}
-	return c.Watermark >= c.Block.Bounds.Stop
+	return c.Watermark >= stop
 }
 func (t *afterWatermarkTrigger) Finished() bool {
 	return t.finished
