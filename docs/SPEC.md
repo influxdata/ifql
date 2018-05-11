@@ -825,9 +825,6 @@ All selector operations have the following properties:
 
 * `column` string
     column specifies a which column to use when selecting.
-* `timeValue` string
-    timeValue specifies which time value to use on the selected record.
-    The value must be the label of a column that exists on the input table.
 
 [IMPL#294](https://github.com/influxdata/ifql/issues/294) Remove concept of Kind from table columns
 
@@ -855,7 +852,6 @@ Min selects the minimum record from the input table.
 
 Sample is a selector operation.
 Sample selects a subset of the records from the input table.
-By default the sample operation uses `_time` as the `timeValue` for the operation.
 
 The following properties define how the sample is selected.
 

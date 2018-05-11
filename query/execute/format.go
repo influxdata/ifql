@@ -100,7 +100,7 @@ func (f *Formatter) WriteTo(out io.Writer) (int64, error) {
 
 	// Write Block header
 	w.write([]byte("Block: keys: ["))
-	w.write([]byte(strings.Join(f.b.Tags().Keys(), ", ")))
+	w.write([]byte(strings.Join(f.b.Key().Labels(), ", ")))
 	w.write([]byte("] bounds: "))
 	w.write([]byte(f.b.Bounds().String()))
 	w.write(eol)
@@ -112,12 +112,13 @@ func (f *Formatter) WriteTo(out io.Writer) (int64, error) {
 
 	// Write rows
 	r := 0
-	f.b.Times().DoTime(func(ts []Time, rr RowReader) {
+	f.b.Do(func(cr ColReader) error {
 		if r == 0 {
-			for i := range ts {
+			l := cr.Len()
+			for i := 0; i < l; i++ {
 				for oj, c := range f.cols.cols {
 					j := f.cols.Idx(oj)
-					buf := f.valueBuf(i, j, c.Type, rr)
+					buf := f.valueBuf(i, j, c.Type, cr)
 					l := len(buf)
 					if l > f.widths[j] {
 						f.widths[j] = l
@@ -133,10 +134,11 @@ func (f *Formatter) WriteTo(out io.Writer) (int64, error) {
 			f.newWidths = make([]int, len(f.widths))
 			copy(f.newWidths, f.widths)
 		}
-		for i := range ts {
+		l := cr.Len()
+		for i := 0; i < l; i++ {
 			for oj, c := range f.cols.cols {
 				j := f.cols.Idx(oj)
-				buf := f.valueBuf(i, j, c.Type, rr)
+				buf := f.valueBuf(i, j, c.Type, cr)
 				l := len(buf)
 				padding := f.widths[j] - l
 				if padding >= 0 {
@@ -165,6 +167,7 @@ func (f *Formatter) WriteTo(out io.Writer) (int64, error) {
 				f.writeHeaderSeparator(w)
 			}
 		}
+		return w.err
 	})
 	return w.n, w.err
 }
@@ -204,21 +207,21 @@ func (f *Formatter) writeHeaderSeparator(w *writeToHelper) {
 	w.write(eol)
 }
 
-func (f *Formatter) valueBuf(i, j int, typ DataType, rr RowReader) (buf []byte) {
+func (f *Formatter) valueBuf(i, j int, typ DataType, cr ColReader) (buf []byte) {
 	switch typ {
 	case TBool:
-		buf = strconv.AppendBool(f.fmtBuf[0:0], rr.AtBool(i, j))
+		buf = strconv.AppendBool(f.fmtBuf[0:0], cr.Bools(j)[i])
 	case TInt:
-		buf = strconv.AppendInt(f.fmtBuf[0:0], rr.AtInt(i, j), 10)
+		buf = strconv.AppendInt(f.fmtBuf[0:0], cr.Ints(j)[i], 10)
 	case TUInt:
-		buf = strconv.AppendUint(f.fmtBuf[0:0], rr.AtUInt(i, j), 10)
+		buf = strconv.AppendUint(f.fmtBuf[0:0], cr.UInts(j)[i], 10)
 	case TFloat:
 		// TODO allow specifying format and precision
-		buf = strconv.AppendFloat(f.fmtBuf[0:0], rr.AtFloat(i, j), 'f', -1, 64)
+		buf = strconv.AppendFloat(f.fmtBuf[0:0], cr.Floats(j)[i], 'f', -1, 64)
 	case TString:
-		buf = []byte(rr.AtString(i, j))
+		buf = []byte(cr.Strings(j)[i])
 	case TTime:
-		buf = []byte(rr.AtTime(i, j).String())
+		buf = []byte(cr.Times(j)[i].String())
 	}
 	return
 }
@@ -260,10 +263,18 @@ func (o orderedCols) Swap(i int, j int) {
 
 func (o orderedCols) Less(i int, j int) bool {
 	// Time column is always first
-	if o.cols[i].Label == TimeColLabel {
+	if o.cols[i].Label == DefaultTimeColLabel {
 		return true
 	}
-	if o.cols[j].Label == TimeColLabel {
+	if o.cols[j].Label == DefaultTimeColLabel {
+		return false
+	}
+
+	// Common cols before other cols
+	if o.cols[i].Common && !o.cols[j].Common {
+		return true
+	}
+	if !o.cols[i].Common && o.cols[j].Common {
 		return false
 	}
 
@@ -273,22 +284,6 @@ func (o orderedCols) Less(i int, j int) bool {
 	}
 	if o.cols[j].Label == DefaultValueColLabel {
 		return true
-	}
-
-	// Common tags before other tags
-	if o.cols[i].IsTag() && o.cols[i].Common && o.cols[j].IsTag() && !o.cols[j].Common {
-		return true
-	}
-	if o.cols[i].IsTag() && !o.cols[i].Common && o.cols[j].IsTag() && o.cols[j].Common {
-		return false
-	}
-
-	// Tags before values
-	if o.cols[i].IsTag() && !o.cols[j].IsTag() {
-		return true
-	}
-	if !o.cols[i].IsTag() && o.cols[j].IsTag() {
-		return false
 	}
 
 	// within a class sort by label

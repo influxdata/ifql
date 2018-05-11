@@ -9,30 +9,79 @@ import (
 	"github.com/influxdata/ifql/query"
 )
 
+const (
+	DefaultStartColLabel = "_start"
+	DefaultStopColLabel  = "_stop"
+	DefaultTimeColLabel  = "_time"
+	DefaultValueColLabel = "_value"
+)
+
 type BlockMetadata interface {
 	Bounds() Bounds
-	Tags() Tags
+	Key() PartitionKey
 }
 
 type BlockKey string
 
 func ToBlockKey(meta BlockMetadata) BlockKey {
 	// TODO: Make this not a hack
-	return BlockKey(fmt.Sprintf("%s:%d-%d", meta.Tags().Key(), meta.Bounds().Start, meta.Bounds().Stop))
+	return BlockKey(fmt.Sprintf("%s:%d-%d", meta.Key().String(), meta.Bounds().Start, meta.Bounds().Stop))
+}
+
+type PartitionKey interface {
+	Labels() []string
+	ValueBool(label string) bool
+	ValueUInt(label string) uint64
+	ValueInt(label string) int64
+	ValueFloat(label string) float64
+	ValueString(label string) string
+	ValueDuration(label string) Duration
+	ValueTime(label string) Time
+	String() string
+}
+
+type partitionKey struct {
+	labels []string
+	values map[string]interface{}
+}
+
+func (k partitionKey) Labels() []string {
+	return k.labels
+}
+func (k partitionKey) ValueBool(label string) bool {
+	return k.values[label].(bool)
+}
+func (k partitionKey) ValueUInt(label string) uint64 {
+	return k.values[label].(uint64)
+}
+func (k partitionKey) ValueInt(label string) int64 {
+	return k.values[label].(int64)
+}
+func (k partitionKey) ValueFloat(label string) float64 {
+	return k.values[label].(float64)
+}
+func (k partitionKey) ValueString(label string) string {
+	return k.values[label].(string)
+}
+func (k partitionKey) ValueDuration(label string) Duration {
+	return k.values[label].(Duration)
+}
+func (k partitionKey) ValueTime(label string) Time {
+	return k.values[label].(Time)
+}
+
+func (k partitionKey) String() string {
+	panic("not implemented")
 }
 
 type Block interface {
 	BlockMetadata
 
 	Cols() []ColMeta
-	// Col returns an iterator to consume the values for a given column.
-	Col(c int) ValueIterator
 
-	// Times returns an iterator to consume the values for the "_time" column.
-	Times() ValueIterator
-	// Values returns an iterator to consume the values for the "_value" column.
-	// If no column exists and error is returned
-	Values() (ValueIterator, error)
+	// Do calls f to process the data contained within the block.
+	// The function f will be called zero or more times.
+	Do(f func(ColReader) error) error
 
 	// RefCount modifies the reference count on the block by n.
 	// When the RefCount goes to zero, the block is freed.
@@ -67,9 +116,10 @@ func CopyBlock(b Block, a *Allocator) Block {
 	for j, c := range cols {
 		colMap[j] = j
 		builder.AddCol(c)
-		if c.IsTag() && c.Common {
-			builder.SetCommonString(j, b.Tags()[c.Label])
-		}
+		// TODO Set Common for any type
+		//if c.IsTag() && c.Common {
+		//	builder.SetCommonString(j, b.Tags()[c.Label])
+		//}
 	}
 
 	AppendBlock(b, builder, colMap)
@@ -81,10 +131,22 @@ func CopyBlock(b Block, a *Allocator) Block {
 // AddBlockCols adds the columns of b onto builder.
 func AddBlockCols(b Block, builder BlockBuilder) {
 	cols := b.Cols()
-	for j, c := range cols {
+	for _, c := range cols {
 		builder.AddCol(c)
-		if c.IsTag() && c.Common {
-			builder.SetCommonString(j, b.Tags()[c.Label])
+		// TODO Set Common for any type
+		//if c.IsTag() && c.Common {
+		//	builder.SetCommonString(j, b.Tags()[c.Label])
+		//}
+	}
+}
+
+func AddBlockKeyCols(b Block, builder BlockBuilder) {
+	cols := b.Cols()
+	for _, c := range cols {
+		if c.Key {
+			builder.AddCol(c)
+			//TODO: Set common value regardless of type
+			//builder.SetCommonString(j, b.Tags()[c.Label])
 		}
 	}
 }
@@ -108,94 +170,45 @@ func AddNewCols(b Block, builder BlockBuilder) []int {
 			builder.AddCol(c)
 			colMap = append(colMap, j)
 
-			if c.IsTag() && c.Common {
-				builder.SetCommonString(j, b.Tags()[c.Label])
-			}
+			// TODO Set Common for any type
+			//if c.IsTag() && c.Common {
+			//	builder.SetCommonString(j, b.Tags()[c.Label])
+			//}
 		}
 	}
 	return colMap
 }
 
 // AppendBlock append data from block b onto builder.
-// The colMap is a map of builder columnm index to block column index.
-// AppendBlock is OneTimeBlock safe.
+// The colMap is a map of builder column index to block column index.
 func AppendBlock(b Block, builder BlockBuilder, colMap []int) {
-	times := b.Times()
+	if len(b.Cols()) == 0 {
+		return
+	}
 
 	cols := builder.Cols()
-	timeIdx := TimeIdx(cols)
-	times.DoTime(func(ts []Time, rr RowReader) {
-		builder.AppendTimes(timeIdx, ts)
+	b.Do(func(cr ColReader) error {
 		for j, c := range cols {
-			if j == timeIdx || c.Common {
-				continue
-			}
-			for i := range ts {
-				switch c.Type {
-				case TBool:
-					builder.AppendBool(j, rr.AtBool(i, colMap[j]))
-				case TInt:
-					builder.AppendInt(j, rr.AtInt(i, colMap[j]))
-				case TUInt:
-					builder.AppendUInt(j, rr.AtUInt(i, colMap[j]))
-				case TFloat:
-					builder.AppendFloat(j, rr.AtFloat(i, colMap[j]))
-				case TString:
-					builder.AppendString(j, rr.AtString(i, colMap[j]))
-				case TTime:
-					builder.AppendTime(j, rr.AtTime(i, colMap[j]))
-				default:
-					PanicUnknownType(c.Type)
-				}
+			nj := colMap[j]
+			switch c.Type {
+			case TBool:
+				builder.AppendBools(j, cr.Bools(nj))
+			case TInt:
+				builder.AppendInts(j, cr.Ints(nj))
+			case TUInt:
+				builder.AppendUInts(j, cr.UInts(nj))
+			case TFloat:
+				builder.AppendFloats(j, cr.Floats(nj))
+			case TString:
+				builder.AppendStrings(j, cr.Strings(nj))
+			case TTime:
+				builder.AppendTimes(j, cr.Times(nj))
+			default:
+				PanicUnknownType(c.Type)
 			}
 		}
+		return nil
 	})
-}
-
-// AppendRow appends a single row from rr onto builder.
-// The colMap is a map of builder columnm index to rr column index.
-func AppendRow(i int, rr RowReader, builder BlockBuilder, colMap []int) {
-	for j, c := range builder.Cols() {
-		switch c.Type {
-		case TBool:
-			builder.AppendBool(j, rr.AtBool(i, colMap[j]))
-		case TInt:
-			builder.AppendInt(j, rr.AtInt(i, colMap[j]))
-		case TUInt:
-			builder.AppendUInt(j, rr.AtUInt(i, colMap[j]))
-		case TFloat:
-			builder.AppendFloat(j, rr.AtFloat(i, colMap[j]))
-		case TString:
-			builder.AppendString(j, rr.AtString(i, colMap[j]))
-		case TTime:
-			builder.AppendTime(j, rr.AtTime(i, colMap[j]))
-		default:
-			PanicUnknownType(c.Type)
-		}
-	}
-}
-
-// AppendRowForCols appends a single row from rr onto builder for the specified cols.
-// The colMap is a map of builder columnm index to rr column index.
-func AppendRowForCols(i int, rr RowReader, builder BlockBuilder, cols []ColMeta, colMap []int) {
-	for j, c := range cols {
-		switch c.Type {
-		case TBool:
-			builder.AppendBool(j, rr.AtBool(i, colMap[j]))
-		case TInt:
-			builder.AppendInt(j, rr.AtInt(i, colMap[j]))
-		case TUInt:
-			builder.AppendUInt(j, rr.AtUInt(i, colMap[j]))
-		case TFloat:
-			builder.AppendFloat(j, rr.AtFloat(i, colMap[j]))
-		case TString:
-			builder.AppendString(j, rr.AtString(i, colMap[j]))
-		case TTime:
-			builder.AppendTime(j, rr.AtTime(i, colMap[j]))
-		default:
-			PanicUnknownType(c.Type)
-		}
-	}
 }
 
 // AddTags add columns to the builder for the given tags.
@@ -204,9 +217,9 @@ func AddTags(t Tags, b BlockBuilder) {
 	keys := t.Keys()
 	for _, k := range keys {
 		j := b.AddCol(ColMeta{
-			Label:  k,
-			Type:   TString,
-			Kind:   TagColKind,
+			Label: k,
+			Type:  TString,
+			//Kind:   TagColKind,
 			Common: true,
 		})
 		b.SetCommonString(j, t[k])
@@ -225,9 +238,6 @@ func ValueCol(cols []ColMeta) (ColMeta, error) {
 }
 func ValueIdx(cols []ColMeta) int {
 	return ColIdx(DefaultValueColLabel, cols)
-}
-func TimeIdx(cols []ColMeta) int {
-	return ColIdx(TimeColLabel, cols)
 }
 func ColIdx(label string, cols []ColMeta) int {
 	for j, c := range cols {
@@ -271,6 +281,9 @@ type BlockBuilder interface {
 	AppendString(j int, value string)
 	AppendTime(j int, value Time)
 
+	AppendBools(j int, values []bool)
+	AppendInts(j int, values []int64)
+	AppendUInts(j int, values []uint64)
 	AppendFloats(j int, values []float64)
 	AppendStrings(j int, values []string)
 	AppendTimes(j int, values []Time)
@@ -320,98 +333,31 @@ func (t DataType) String() string {
 }
 
 type ColMeta struct {
-	Label string
-	Type  DataType
-	Kind  ColKind
-	// Common indicates that the value for the column is shared by all rows.
-	Common bool
+	Label  string
+	Type   DataType
+	Key    bool // Key indicates that the column is part of the partition key
+	Common bool // Common indicates that the value for the column is shared by all rows.
 }
-
-func (c ColMeta) IsTime() bool {
-	return c.Kind == TimeColKind
-}
-func (c ColMeta) IsTag() bool {
-	return c.Kind == TagColKind
-}
-func (c ColMeta) IsValue() bool {
-	return c.Kind == ValueColKind
-}
-
-const (
-	DefaultValueColLabel = "_value"
-	TimeColLabel         = "_time"
-)
-
-type ColKind int
-
-const (
-	InvalidColKind = iota
-	TimeColKind
-	TagColKind
-	ValueColKind
-)
-
-func (k ColKind) String() string {
-	switch k {
-	case InvalidColKind:
-		return "invalid"
-	case TimeColKind:
-		return "time"
-	case TagColKind:
-		return "tag"
-	case ValueColKind:
-		return "value"
-	default:
-		return "unknown"
-	}
-}
-
-var (
-	TimeCol = ColMeta{
-		Label: TimeColLabel,
-		Type:  TTime,
-		Kind:  TimeColKind,
-	}
-)
 
 type BlockIterator interface {
 	Do(f func(Block) error) error
 }
 
-type ValueIterator interface {
-	DoBool(f func([]bool, RowReader))
-	DoInt(f func([]int64, RowReader))
-	DoUInt(f func([]uint64, RowReader))
-	DoFloat(f func([]float64, RowReader))
-	DoString(f func([]string, RowReader))
-	DoTime(f func([]Time, RowReader))
-}
-
-type RowReader interface {
+// ColReader allows access to reading slices of column data.
+// All data the ColReader exposes is guaranteed to be in memory.
+// Once a ColReader goes out of scope all slices are considered invalid.
+type ColReader interface {
+	// Cols returns a list of column metadata.
 	Cols() []ColMeta
-	// AtBool returns the bool value of another column and given index.
-	AtBool(i, j int) bool
-	// AtInt returns the int value of another column and given index.
-	AtInt(i, j int) int64
-	// AtUInt returns the uint value of another column and given index.
-	AtUInt(i, j int) uint64
-	// AtFloat returns the float value of another column and given index.
-	AtFloat(i, j int) float64
-	// AtString returns the string value of another column and given index.
-	AtString(i, j int) string
-	// AtTime returns the time value of another column and given index.
-	AtTime(i, j int) Time
-}
-
-func TagsForRow(i int, rr RowReader) Tags {
-	cols := rr.Cols()
-	tags := make(Tags, len(cols))
-	for j, c := range cols {
-		if c.IsTag() {
-			tags[c.Label] = rr.AtString(i, j)
-		}
-	}
-	return tags
+	// Len returns the length of the slices.
+	// All slices will have the same length.
+	Len() int
+	Bools(j int) []bool
+	Ints(j int) []int64
+	UInts(j int) []uint64
+	Floats(j int) []float64
+	Strings(j int) []string
+	Times(j int) []Time
 }
 
 type Tags map[string]string
@@ -527,9 +473,10 @@ func (b ColListBlockBuilder) Bounds() Bounds {
 	return b.blk.bounds
 }
 
-func (b ColListBlockBuilder) Tags() Tags {
-	return b.blk.tags
+func (b ColListBlockBuilder) Key() PartitionKey {
+	panic("not implemented")
 }
+
 func (b ColListBlockBuilder) NRows() int {
 	return b.blk.nrows
 }
@@ -686,12 +633,6 @@ func (b ColListBlockBuilder) SetCommonString(j int, value string) {
 		panic(fmt.Errorf("cannot set common value for column %s, column is not marked as common", meta.Label))
 	}
 	b.blk.cols[j].(*commonStrColumn).value = value
-	if meta.IsTag() {
-		if b.blk.tags == nil {
-			b.blk.tags = make(Tags)
-		}
-		b.blk.tags[meta.Label] = value
-	}
 }
 
 func (b ColListBlockBuilder) SetTime(i int, j int, value Time) {
@@ -763,7 +704,7 @@ func (b ColListBlockBuilder) Sort(cols []string, desc bool) {
 // As a result At* methods are provided directly on the block for easy access.
 type ColListBlock struct {
 	bounds Bounds
-	tags   Tags
+	//tags   Tags
 
 	colMeta []ColMeta
 	cols    []column
@@ -785,84 +726,53 @@ func (b *ColListBlock) Bounds() Bounds {
 	return b.bounds
 }
 
-func (b *ColListBlock) Tags() Tags {
-	return b.tags
+func (b *ColListBlock) Key() PartitionKey {
+	panic("not implemented")
 }
-
 func (b *ColListBlock) Cols() []ColMeta {
 	return b.colMeta
 }
-func (b ColListBlock) NRows() int {
+func (b *ColListBlock) NRows() int {
 	return b.nrows
 }
 
-func (b *ColListBlock) Col(c int) ValueIterator {
-	return colListValueIterator{
-		col:     c,
-		colMeta: b.colMeta,
-		cols:    b.cols,
-		nrows:   b.nrows,
-	}
+func (b *ColListBlock) Len() int {
+	return b.nrows
 }
 
-func (b *ColListBlock) Values() (ValueIterator, error) {
-	j := ValueIdx(b.colMeta)
-	if j >= 0 {
-		return colListValueIterator{
-			col:     j,
-			colMeta: b.colMeta,
-			cols:    b.cols,
-			nrows:   b.nrows,
-		}, nil
-	}
-	return nil, NoDefaultValueColumn
+func (b *ColListBlock) Do(f func(ColReader) error) error {
+	return f(b)
 }
 
-func (b *ColListBlock) Times() ValueIterator {
-	j := TimeIdx(b.colMeta)
-	if j >= 0 {
-		return colListValueIterator{
-			col:     j,
-			colMeta: b.colMeta,
-			cols:    b.cols,
-			nrows:   b.nrows,
-		}
-	}
-	return nil
-}
-func (b *ColListBlock) AtBool(i, j int) bool {
+func (b *ColListBlock) Bools(j int) []bool {
 	CheckColType(b.colMeta[j], TBool)
-	return b.cols[j].(*boolColumn).data[i]
+	return b.cols[j].(*boolColumn).data
 }
-func (b *ColListBlock) AtInt(i, j int) int64 {
+func (b *ColListBlock) Ints(j int) []int64 {
 	CheckColType(b.colMeta[j], TInt)
-	return b.cols[j].(*intColumn).data[i]
+	return b.cols[j].(*intColumn).data
 }
-func (b *ColListBlock) AtUInt(i, j int) uint64 {
+func (b *ColListBlock) UInts(j int) []uint64 {
 	CheckColType(b.colMeta[j], TUInt)
-	return b.cols[j].(*uintColumn).data[i]
+	return b.cols[j].(*uintColumn).data
 }
-func (b *ColListBlock) AtFloat(i, j int) float64 {
+func (b *ColListBlock) Floats(j int) []float64 {
 	CheckColType(b.colMeta[j], TFloat)
-	return b.cols[j].(*floatColumn).data[i]
+	return b.cols[j].(*floatColumn).data
 }
-func (b *ColListBlock) AtString(i, j int) string {
+func (b *ColListBlock) Strings(j int) []string {
 	meta := b.colMeta[j]
 	CheckColType(meta, TString)
-	if meta.IsTag() && meta.Common {
-		return b.cols[j].(*commonStrColumn).value
-	}
-	return b.cols[j].(*stringColumn).data[i]
+	return b.cols[j].(*stringColumn).data
 }
-func (b *ColListBlock) AtTime(i, j int) Time {
+func (b *ColListBlock) Times(j int) []Time {
 	CheckColType(b.colMeta[j], TTime)
-	return b.cols[j].(*timeColumn).data[i]
+	return b.cols[j].(*timeColumn).data
 }
 
 func (b *ColListBlock) Copy() *ColListBlock {
 	cpy := new(ColListBlock)
 	cpy.bounds = b.bounds
-	cpy.tags = b.tags.Copy()
 	cpy.nrows = b.nrows
 
 	cpy.colMeta = make([]ColMeta, len(b.colMeta))
@@ -874,78 +784,6 @@ func (b *ColListBlock) Copy() *ColListBlock {
 	}
 
 	return cpy
-}
-
-type colListValueIterator struct {
-	col     int
-	cols    []column
-	colMeta []ColMeta
-	nrows   int
-}
-
-func (itr colListValueIterator) Cols() []ColMeta {
-	return itr.colMeta
-}
-func (itr colListValueIterator) DoBool(f func([]bool, RowReader)) {
-	CheckColType(itr.colMeta[itr.col], TBool)
-	f(itr.cols[itr.col].(*boolColumn).data, itr)
-}
-func (itr colListValueIterator) DoInt(f func([]int64, RowReader)) {
-	CheckColType(itr.colMeta[itr.col], TInt)
-	f(itr.cols[itr.col].(*intColumn).data, itr)
-}
-func (itr colListValueIterator) DoUInt(f func([]uint64, RowReader)) {
-	CheckColType(itr.colMeta[itr.col], TUInt)
-	f(itr.cols[itr.col].(*uintColumn).data, itr)
-}
-func (itr colListValueIterator) DoFloat(f func([]float64, RowReader)) {
-	CheckColType(itr.colMeta[itr.col], TFloat)
-	f(itr.cols[itr.col].(*floatColumn).data, itr)
-}
-func (itr colListValueIterator) DoString(f func([]string, RowReader)) {
-	meta := itr.colMeta[itr.col]
-	CheckColType(meta, TString)
-	if meta.IsTag() && meta.Common {
-		value := itr.cols[itr.col].(*commonStrColumn).value
-		strs := make([]string, itr.nrows)
-		for i := range strs {
-			strs[i] = value
-		}
-		f(strs, itr)
-	}
-	f(itr.cols[itr.col].(*stringColumn).data, itr)
-}
-func (itr colListValueIterator) DoTime(f func([]Time, RowReader)) {
-	CheckColType(itr.colMeta[itr.col], TTime)
-	f(itr.cols[itr.col].(*timeColumn).data, itr)
-}
-func (itr colListValueIterator) AtBool(i, j int) bool {
-	CheckColType(itr.colMeta[j], TBool)
-	return itr.cols[j].(*boolColumn).data[i]
-}
-func (itr colListValueIterator) AtInt(i, j int) int64 {
-	CheckColType(itr.colMeta[j], TInt)
-	return itr.cols[j].(*intColumn).data[i]
-}
-func (itr colListValueIterator) AtUInt(i, j int) uint64 {
-	CheckColType(itr.colMeta[j], TUInt)
-	return itr.cols[j].(*uintColumn).data[i]
-}
-func (itr colListValueIterator) AtFloat(i, j int) float64 {
-	CheckColType(itr.colMeta[j], TFloat)
-	return itr.cols[j].(*floatColumn).data[i]
-}
-func (itr colListValueIterator) AtString(i, j int) string {
-	meta := itr.colMeta[j]
-	CheckColType(meta, TString)
-	if meta.IsTag() && meta.Common {
-		return itr.cols[j].(*commonStrColumn).value
-	}
-	return itr.cols[j].(*stringColumn).data[i]
-}
-func (itr colListValueIterator) AtTime(i, j int) Time {
-	CheckColType(itr.colMeta[j], TTime)
-	return itr.cols[j].(*timeColumn).data[i]
 }
 
 type colListBlockSorter struct {
