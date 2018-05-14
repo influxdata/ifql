@@ -6,6 +6,7 @@ import (
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/semantic"
+	"github.com/influxdata/ifql/query/execute"
 )
 
 const RangeKind = "range"
@@ -25,7 +26,7 @@ func init() {
 	query.RegisterOpSpec(RangeKind, newRangeOp)
 	plan.RegisterProcedureSpec(RangeKind, newRangeProcedure, RangeKind)
 	// TODO register a range transformation. Currently range is only supported if it is pushed down into a select procedure.
-	//execute.RegisterTransformation(RangeKind, createRangeTransformation)
+	execute.RegisterTransformation(RangeKind, createRangeTransformation)
 }
 
 func createRangeOpSpec(args query.Arguments, a *query.Administration) (query.OperationSpec, error) {
@@ -111,4 +112,63 @@ func (s *RangeProcedureSpec) PushDown(root *plan.Procedure, dup func() *plan.Pro
 
 func (s *RangeProcedureSpec) TimeBounds() plan.BoundsSpec {
 	return s.Bounds
+}
+
+func createRangeTransformation(id execute.DatasetID, mode execute.AccumulationMode, spec plan.ProcedureSpec, a execute.Administration) (execute.Transformation, execute.Dataset, error) {
+	s, ok := spec.(*RangeProcedureSpec)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid spec type %T", spec)
+	}
+	cache := execute.NewBlockBuilderCache(a.Allocator())
+	d := execute.NewDataset(id, mode, cache)
+	t, err := NewRangeTransformation(d, cache, s)
+	if err != nil {
+		return nil, nil, err
+	}
+	return t, d, nil
+}
+
+type rangeTransformation struct {
+	d     execute.Dataset
+	cache execute.BlockBuilderCache
+
+	Start query.Time
+	Stop  query.Time
+}
+
+func NewRangeTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *RangeProcedureSpec) (*rangeTransformation, error) {
+	return &rangeTransformation{
+		d:     d,
+		cache: cache,
+		Start: spec.Bounds.Start,
+		Stop: spec.Bounds.Stop,
+	}, nil
+}
+
+func (t *rangeTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
+	return t.d.RetractBlock(execute.ToBlockKey(meta))
+}
+
+func (t *rangeTransformation) Process(id execute.DatasetID, b execute.Block) error {
+	builder, new := t.cache.BlockBuilder(b)
+	if new {
+		execute.AddBlockCols(b, builder)
+	}
+	cols := make([]int, len(b.Cols()))
+	for i := range(cols) {
+		cols[i] = i
+	}
+	execute.AppendBlock(b, builder, cols)
+
+	return nil
+}
+
+func (t *rangeTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {
+	return t.d.UpdateWatermark(mark)
+}
+func (t *rangeTransformation) UpdateProcessingTime(id execute.DatasetID, pt execute.Time) error {
+	return t.d.UpdateProcessingTime(pt)
+}
+func (t *rangeTransformation) Finish(id execute.DatasetID, err error) {
+	t.d.Finish(err)
 }
