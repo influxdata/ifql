@@ -114,6 +114,9 @@ func RegisterBuiltInValue(name string, v values.Value) {
 // FinalizeRegistration must be called to complete registration.
 // Future calls to RegisterFunction, RegisterBuiltIn or RegisterBuiltInValue will panic.
 func FinalizeRegistration() {
+	if finalized {
+		panic("already finalized")
+	}
 	finalized = true
 	//for name, script := range builtins {
 	//	astProg, err := parser.NewAST(script)
