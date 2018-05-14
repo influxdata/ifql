@@ -192,7 +192,7 @@ func (f *RowMapFn) Type() semantic.Type {
 	return f.preparedFn.Type()
 }
 
-func (f *RowMapFn) Eval(row int, rr RowReader) (*Record, error) {
+func (f *RowMapFn) Eval(row int, rr RowReader) (values.Object, error) {
 	v, err := f.rowFn.eval(row, rr)
 	if err != nil {
 		return nil, err
@@ -201,7 +201,7 @@ func (f *RowMapFn) Eval(row int, rr RowReader) (*Record, error) {
 		f.wrapObj.Set(DefaultValueColLabel, v)
 		return f.wrapObj, nil
 	}
-	return v.Object().(*Record), nil
+	return v.Object(), nil
 }
 
 func ValueForRow(i, j int, rr RowReader) values.Value {
