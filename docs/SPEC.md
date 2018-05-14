@@ -684,7 +684,7 @@ Within a stream each table's partition key value is unique.
 #### Missing values
 
 A record may be missing a value for a specific column.
-Missing values are represented will a special _null_ value.
+Missing values are represented with a special _null_ value.
 The _null_ value can be of any data type.
 
 
