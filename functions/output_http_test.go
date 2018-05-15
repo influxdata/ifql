@@ -1,49 +1,26 @@
 package functions_test
 
 import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/influxdata/ifql/functions"
 	"github.com/influxdata/ifql/query"
-	"github.com/influxdata/ifql/query/plan"
-	"github.com/influxdata/ifql/query/plan/plantest"
+	"github.com/influxdata/ifql/query/execute"
+	"github.com/influxdata/ifql/query/execute/executetest"
 	"github.com/influxdata/ifql/query/querytest"
 )
-
-// func TestOutputHTTP_Marshaling(t *testing.T) {
-// 	data := []byte(`{"id":"outputHTTP", "kind":"outputHTTP"}`)
-// 	op := &query.Operation{
-// 		ID:   "outputHTTP",
-// 		Spec: &functions.OutputHTTPOpSpec{},
-// 	}
-// 	querytest.OperationMarshalingTestHelper(t, data, op)
-// }
-
-// func TestOutputHTTP_NewQuery(t *testing.T) {
-// 	executetest.TransformationPassThroughTestHelper(t, func(d execute.Dataset, c execute.BlockBuilderCache) execute.Transformation {
-
-// 	})
-// }
-
-// package functions_test
-
-// import (
-// 	"testing"
-// 	"time"
-
-// 	"github.com/influxdata/ifql/functions"
-// 	"github.com/influxdata/ifql/query"
-// 	"github.com/influxdata/ifql/query/plan"
-// 	"github.com/influxdata/ifql/query/plan/plantest"
-// 	"github.com/influxdata/ifql/query/querytest"
-// )
 
 func TestOutputHTTP_NewQuery(t *testing.T) {
 	tests := []querytest.NewQueryTestCase{
 		{
 			Name: "from with database with range",
-			Raw:  `from(db:"mydb") |> range(start:-4h, stop:-2h) |> sum()`,
+			Raw:  `from(db:"mydb") |> outputHTTP(addr: "https://localhost:8081", method:"POST",  timeout: 50s)`, //[{header:"fred" value:"oh no"}, {header:"key2", "value":"oh my!"}, {header:"x-forwarded-for", value:"https://fakeaddr.com"}])`,
 			Want: &query.Spec{
 				Operations: []*query.Operation{
 					{
@@ -53,26 +30,17 @@ func TestOutputHTTP_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID: "range1",
-						Spec: &functions.RangeOpSpec{
-							Start: query.Time{
-								Relative:   -4 * time.Hour,
-								IsRelative: true,
-							},
-							Stop: query.Time{
-								Relative:   -2 * time.Hour,
-								IsRelative: true,
-							},
+						ID: "outputHTTP1",
+						Spec: &functions.OutputHTTPOpSpec{
+							Addr:       "https://localhost:8081",
+							Method:     "POST",
+							Timeout:    50 * time.Second,
+							TimeColumn: execute.TimeColLabel,
 						},
-					},
-					{
-						ID:   "sum2",
-						Spec: &functions.SumOpSpec{},
 					},
 				},
 				Edges: []query.Edge{
-					{Parent: "from0", Child: "range1"},
-					{Parent: "range1", Child: "sum2"},
+					{Parent: "from0", Child: "outputHTTP1"},
 				},
 			},
 		},
@@ -156,26 +124,103 @@ func TestOutputHTTPOpSpec_UnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestOutputHTTP_PushDown(t *testing.T) {
-	spec := &functions.RangeProcedureSpec{
-		Bounds: plan.BoundsSpec{
-			Stop: query.Now,
-		},
+func TestOutputHTTP_Process(t *testing.T) {
+	data := []byte{}
+	wg := sync.WaitGroup{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
+		fmt.Println("IN SERVER")
+		defer wg.Done()
+		data, err = ioutil.ReadAll(r.Body)
+		fmt.Println("after readall ", string(data))
+		if err != nil {
+			t.Log(err)
+			t.FailNow()
+		}
+	}))
+	type wanted struct {
+		Block  []*executetest.Block
+		Result []byte
 	}
-	root := &plan.Procedure{
-		Spec: new(functions.FromProcedureSpec),
-	}
-	want := &plan.Procedure{
-		Spec: &functions.FromProcedureSpec{
-			BoundsSet: true,
-			Bounds: plan.BoundsSpec{
-				Stop: query.Now,
+	testCases := []struct {
+		name string
+		spec *functions.OutputHTTPProcedureSpec
+		data []execute.Block
+		want wanted
+	}{
+		{
+			name: "one block",
+			spec: &functions.OutputHTTPProcedureSpec{
+				Spec: &functions.OutputHTTPOpSpec{
+					Addr:       server.URL,
+					Method:     "POST",
+					Timeout:    50 * time.Second,
+					TimeColumn: execute.TimeColLabel,
+				},
+			},
+			data: []execute.Block{&executetest.Block{
+				Bnds: execute.Bounds{
+					Start: 1,
+					Stop:  5,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+				},
+				Data: [][]interface{}{
+					{execute.Time(1), 2.0},
+					{execute.Time(2), 1.0},
+					{execute.Time(3), 3.0},
+					{execute.Time(4), 4.0},
+				},
+			}},
+			want: wanted{
+				Block:  []*executetest.Block(nil),
+				Result: []byte("food"),
 			},
 		},
 	}
-
-	plantest.PhysicalPlan_PushDown_TestHelper(t, spec, root, false, want)
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			wg.Add(1)
+			executetest.ProcessTestHelper(
+				t,
+				tc.data,
+				tc.want.Block,
+				func(d execute.Dataset, c execute.BlockBuilderCache) execute.Transformation {
+					return functions.NewOutputHTTPTransformation(d, c, tc.spec)
+				},
+			)
+			wg.Wait() // wait till we are done getting the data back
+			if string(data) != string(tc.want.Result) {
+				t.Logf("expected %s, got %s", string(tc.want.Result), string(data))
+				t.Fail()
+			}
+		})
+	}
 }
+
+// func TestOutputHTTP_PushDown(t *testing.T) {
+// 	spec := &functions.RangeProcedureSpec{
+// 		Bounds: plan.BoundsSpec{
+// 			Stop: query.Now,
+// 		},
+// 	}
+// 	root := &plan.Procedure{
+// 		Spec: new(functions.FromProcedureSpec),
+// 	}
+// 	want := &plan.Procedure{
+// 		Spec: &functions.FromProcedureSpec{
+// 			BoundsSet: true,
+// 			Bounds: plan.BoundsSpec{
+// 				Stop: query.Now,
+// 			},
+// 		},
+// 	}
+
+// 	plantest.PhysicalPlan_PushDown_TestHelper(t, spec, root, false, want)
+// }
 
 // func TestOutputHTTP_PushDown_Duplicate(t *testing.T) {
 // 	spec := &functions.RangeProcedureSpec{

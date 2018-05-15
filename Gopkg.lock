@@ -201,6 +201,12 @@
   version = "v1.3.7"
 
 [[projects]]
+  branch = "line-protocol"
+  name = "github.com/influxdata/line-protocol"
+  packages = ["."]
+  revision = "7b6f8785406f41b27431cbdb3e8bc13e342baa9b"
+
+[[projects]]
   branch = "master"
   name = "github.com/influxdata/tdigest"
   packages = ["."]
