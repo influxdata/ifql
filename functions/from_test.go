@@ -80,7 +80,7 @@ func TestFrom_NewQuery(t *testing.T) {
 }
 
 func TestFromOperation_Marshaling(t *testing.T) {
-	data := []byte(`{"id":"from","kind":"from","spec":{"database":"mydb"}}`)
+	data := []byte(`{"id":"from","kind":"from","spec":{"db":"mydb"}}`)
 	op := &query.Operation{
 		ID: "from",
 		Spec: &functions.FromOpSpec{

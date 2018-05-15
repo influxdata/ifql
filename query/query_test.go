@@ -23,7 +23,7 @@ func TestQuery_JSON(t *testing.T) {
 			"id": "from",
 			"kind": "from",
 			"spec": {
-				"database":"mydb"
+				"db":"mydb"
 			}
 		},
 		{
