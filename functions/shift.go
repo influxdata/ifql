@@ -3,6 +3,7 @@ package functions
 import (
 	"fmt"
 
+	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
@@ -12,7 +13,8 @@ import (
 const ShiftKind = "shift"
 
 type ShiftOpSpec struct {
-	Shift query.Duration `json:"shift"`
+	Shift   query.Duration `json:"shift"`
+	Columns []string       `json:"columns"`
 }
 
 var shiftSignature = query.DefaultFunctionSignature()
@@ -39,6 +41,21 @@ func createShiftOpSpec(args query.Arguments, a *query.Administration) (query.Ope
 		spec.Shift = shift
 	}
 
+	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
+		return nil, err
+	} else if ok {
+		columns, err := interpreter.ToStringArray(cols)
+		if err != nil {
+			return nil, err
+		}
+		spec.Columns = columns
+	} else {
+		spec.Columns = []string{
+			execute.DefaultTimeColLabel,
+			execute.DefaultStopColLabel,
+			execute.DefaultStartColLabel,
+		}
+	}
 	return spec, nil
 }
 
@@ -51,15 +68,20 @@ func (s *ShiftOpSpec) Kind() query.OperationKind {
 }
 
 type ShiftProcedureSpec struct {
-	Shift query.Duration
+	Shift   query.Duration
+	Columns []string
 }
 
 func newShiftProcedure(qs query.OperationSpec, _ plan.Administration) (plan.ProcedureSpec, error) {
-	if spec, ok := qs.(*ShiftOpSpec); ok {
-		return &ShiftProcedureSpec{Shift: spec.Shift}, nil
+	spec, ok := qs.(*ShiftOpSpec)
+	if !ok {
+		return nil, fmt.Errorf("invalid spec type %T", qs)
 	}
 
-	return nil, fmt.Errorf("invalid spec type %T", qs)
+	return &ShiftProcedureSpec{
+		Shift:   spec.Shift,
+		Columns: spec.Columns,
+	}, nil
 }
 
 func (s *ShiftProcedureSpec) Kind() plan.ProcedureKind {
@@ -67,7 +89,14 @@ func (s *ShiftProcedureSpec) Kind() plan.ProcedureKind {
 }
 
 func (s *ShiftProcedureSpec) Copy() plan.ProcedureSpec {
-	return &ShiftProcedureSpec{Shift: s.Shift}
+	ns := new(ShiftProcedureSpec)
+	*ns = *s
+
+	if s.Columns != nil {
+		ns.Columns = make([]string, len(s.Columns))
+		copy(ns.Columns, s.Columns)
+	}
+	return ns
 }
 
 func createShiftTransformation(id execute.DatasetID, mode execute.AccumulationMode, spec plan.ProcedureSpec, a execute.Administration) (execute.Transformation, execute.Dataset, error) {
@@ -82,73 +111,62 @@ func createShiftTransformation(id execute.DatasetID, mode execute.AccumulationMo
 }
 
 type shiftTransformation struct {
-	d     execute.Dataset
-	cache execute.BlockBuilderCache
-	shift execute.Duration
+	d       execute.Dataset
+	cache   execute.BlockBuilderCache
+	shift   execute.Duration
+	columns []string
 }
 
 func NewShiftTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *ShiftProcedureSpec) *shiftTransformation {
 	return &shiftTransformation{
-		d:     d,
-		cache: cache,
-		shift: execute.Duration(spec.Shift),
+		d:       d,
+		cache:   cache,
+		shift:   execute.Duration(spec.Shift),
+		columns: spec.Columns,
 	}
 }
 
-func (t *shiftTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *shiftTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *shiftTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, nw := t.cache.BlockBuilder(blockMetadata{
-		tags:   b.Tags(),
-		bounds: b.Bounds().Shift(t.shift),
-	})
+	key := b.Key()
+	// Update key
+	cols := make([]execute.ColMeta, len(key.Cols()))
+	values := make([]interface{}, len(key.Cols()))
+	for j, c := range key.Cols() {
+		if execute.ContainsStr(t.columns, c.Label) {
+			if c.Type != execute.TTime {
+				return fmt.Errorf("column %q is not of type time", c.Label)
+			}
+			cols[j] = c
+			values[j] = key.ValueTime(j).Add(t.shift)
+		} else {
+			cols[j] = c
+			values[j] = key.Value(j)
+		}
+	}
+	key = execute.NewPartitionKey(cols, values)
 
-	if nw {
+	builder, new := t.cache.BlockBuilder(key)
+	if new {
 		execute.AddBlockCols(b, builder)
 	}
 
-	var k []execute.Time
-	cols := builder.Cols()
-	timeIdx := execute.TimeIdx(cols)
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		if cap(k) < len(ts) {
-			k = make([]execute.Time, len(ts))
-		}
-		k = k[:len(ts)]
-
-		for i := range ts {
-			k[i] = ts[i].Add(t.shift)
-		}
-
-		builder.AppendTimes(timeIdx, k)
-		for j, c := range cols {
-			if j == timeIdx || c.Common {
-				continue
-			}
-			for i := range ts {
-				switch c.Type {
-				case execute.TBool:
-					builder.AppendBool(j, rr.AtBool(i, j))
-				case execute.TInt:
-					builder.AppendInt(j, rr.AtInt(i, j))
-				case execute.TUInt:
-					builder.AppendUInt(j, rr.AtUInt(i, j))
-				case execute.TFloat:
-					builder.AppendFloat(j, rr.AtFloat(i, j))
-				case execute.TString:
-					builder.AppendString(j, rr.AtString(i, j))
-				case execute.TTime:
-					builder.AppendTime(j, rr.AtTime(i, j))
-				default:
-					execute.PanicUnknownType(c.Type)
+	return b.Do(func(cr execute.ColReader) error {
+		for j, c := range cr.Cols() {
+			if execute.ContainsStr(t.columns, c.Label) {
+				l := cr.Len()
+				for i := 0; i < l; i++ {
+					builder.AppendTime(j, cr.Times(j)[i].Add(t.shift))
 				}
+			} else {
+				execute.AppendCol(j, j, cr, builder)
 			}
 		}
+		return nil
 	})
-
-	return nil
 }
 
 func (t *shiftTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {

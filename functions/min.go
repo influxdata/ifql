@@ -128,7 +128,7 @@ func (s *MinSelector) Rows() []execute.Row {
 func (s *MinSelector) selectRow(idx int, cr execute.ColReader) {
 	// Capture row
 	if idx >= 0 {
-		s.rows = []execute.Row{execute.ReadRow(idx, rr)}
+		s.rows = []execute.Row{execute.ReadRow(idx, cr)}
 	}
 }
 
@@ -141,7 +141,7 @@ func (s *MinIntSelector) DoInt(vs []int64, cr execute.ColReader) {
 			minIdx = i
 		}
 	}
-	s.selectRow(minIdx, rr)
+	s.selectRow(minIdx, cr)
 }
 func (s *MinUIntSelector) DoUInt(vs []uint64, cr execute.ColReader) {
 	minIdx := -1
@@ -152,7 +152,7 @@ func (s *MinUIntSelector) DoUInt(vs []uint64, cr execute.ColReader) {
 			minIdx = i
 		}
 	}
-	s.selectRow(minIdx, rr)
+	s.selectRow(minIdx, cr)
 }
 func (s *MinFloatSelector) DoFloat(vs []float64, cr execute.ColReader) {
 	minIdx := -1
@@ -163,5 +163,5 @@ func (s *MinFloatSelector) DoFloat(vs []float64, cr execute.ColReader) {
 			minIdx = i
 		}
 	}
-	s.selectRow(minIdx, rr)
+	s.selectRow(minIdx, cr)
 }

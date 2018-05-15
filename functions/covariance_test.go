@@ -170,10 +170,6 @@ func TestCovariance_Process(t *testing.T) {
 			},
 			spec: &functions.CovarianceProcedureSpec{},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -188,10 +184,6 @@ func TestCovariance_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -209,10 +201,6 @@ func TestCovariance_Process(t *testing.T) {
 			},
 			spec: &functions.CovarianceProcedureSpec{},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -227,10 +215,6 @@ func TestCovariance_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -248,10 +232,6 @@ func TestCovariance_Process(t *testing.T) {
 			},
 			spec: &functions.CovarianceProcedureSpec{},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -266,10 +246,6 @@ func TestCovariance_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -289,10 +265,6 @@ func TestCovariance_Process(t *testing.T) {
 				PearsonCorrelation: true,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -307,10 +279,6 @@ func TestCovariance_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -330,10 +298,6 @@ func TestCovariance_Process(t *testing.T) {
 				PearsonCorrelation: true,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
@@ -348,10 +312,6 @@ func TestCovariance_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
 					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},

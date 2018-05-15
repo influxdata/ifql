@@ -7,6 +7,7 @@ import (
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/semantic"
+	"github.com/pkg/errors"
 )
 
 const LimitKind = "limit"
@@ -21,7 +22,7 @@ type LimitOpSpec struct {
 var limitSignature = query.DefaultFunctionSignature()
 
 func init() {
-	integralSignature.Params["n"] = semantic.Int
+	limitSignature.Params["n"] = semantic.Int
 
 	query.RegisterFunction(LimitKind, createLimitOpSpec, limitSignature)
 	query.RegisterOpSpec(LimitKind, newLimitOp)
@@ -131,12 +132,12 @@ func NewLimitTransformation(d execute.Dataset, cache execute.BlockBuilderCache, 
 	}
 }
 
-func (t *limitTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *limitTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *limitTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if new {
 		execute.AddBlockCols(b, builder)
 	}
@@ -153,42 +154,57 @@ func (t *limitTransformation) Process(id execute.DatasetID, b execute.Block) err
 
 	// AppendBlock with limit
 	n := t.n
-	times := b.Times()
-
-	cols := builder.Cols()
-	timeIdx := execute.TimeIdx(cols)
-	times.DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		l := len(ts)
+	b.Do(func(cr execute.ColReader) error {
+		if n <= 0 {
+			// Returning an error terminates iteration
+			return errors.New("finished")
+		}
+		l := cr.Len()
 		if l > n {
 			l = n
 		}
 		n -= l
-		builder.AppendTimes(timeIdx, ts[:l])
-		for j, c := range cols {
-			if j == timeIdx || c.Common {
-				continue
-			}
-			for i := range ts[:l] {
-				switch c.Type {
-				case execute.TBool:
-					builder.AppendBool(j, rr.AtBool(i, t.colMap[j]))
-				case execute.TInt:
-					builder.AppendInt(j, rr.AtInt(i, t.colMap[j]))
-				case execute.TUInt:
-					builder.AppendUInt(j, rr.AtUInt(i, t.colMap[j]))
-				case execute.TFloat:
-					builder.AppendFloat(j, rr.AtFloat(i, t.colMap[j]))
-				case execute.TString:
-					builder.AppendString(j, rr.AtString(i, t.colMap[j]))
-				case execute.TTime:
-					builder.AppendTime(j, rr.AtTime(i, t.colMap[j]))
-				default:
-					execute.PanicUnknownType(c.Type)
-				}
-			}
+		lcr := limitColReader{
+			ColReader: cr,
+			n:         l,
 		}
+		execute.AppendCols(lcr, builder, t.colMap)
+		return nil
 	})
 	return nil
+}
+
+type limitColReader struct {
+	execute.ColReader
+	n int
+}
+
+func (cr limitColReader) Len() int {
+	return cr.n
+}
+
+func (cr limitColReader) Bools(j int) []bool {
+	return cr.ColReader.Bools(j)[:cr.n]
+}
+
+func (cr limitColReader) Ints(j int) []int64 {
+	return cr.ColReader.Ints(j)[:cr.n]
+}
+
+func (cr limitColReader) UInts(j int) []uint64 {
+	return cr.ColReader.UInts(j)[:cr.n]
+}
+
+func (cr limitColReader) Floats(j int) []float64 {
+	return cr.ColReader.Floats(j)[:cr.n]
+}
+
+func (cr limitColReader) Strings(j int) []string {
+	return cr.ColReader.Strings(j)[:cr.n]
+}
+
+func (cr limitColReader) Times(j int) []execute.Time {
+	return cr.ColReader.Times(j)[:cr.n]
 }
 
 func (t *limitTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {

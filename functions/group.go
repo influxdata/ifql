@@ -271,23 +271,14 @@ func (t *groupTransformation) Process(id execute.DatasetID, b execute.Block) err
 	return b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()
 		for i := 0; i < l; i++ {
-			key := make(map[string]interface{}, len(on))
-			for j, c := range cols {
-				if on[c.Label] {
-					switch c.Type {
-					case execute.TBool:
-						key[c.Label] = cr.Bools(j)[i]
-					case execute.TInt:
-						key[c.Label] = cr.Ints(j)[i]
-					}
-				}
-			}
+			key := execute.PartitionKeyForRow(i, cr)
 			builder, new := t.cache.BlockBuilder(key)
 			if new {
-				execute.AddBlockKeyCols(b, builder)
+				execute.AddBlockKeyCols(b.Key(), builder)
 			}
 			execute.AppendRecord(i, cr, builder)
 		}
+		return nil
 	})
 }
 
@@ -299,16 +290,4 @@ func (t *groupTransformation) UpdateProcessingTime(id execute.DatasetID, pt exec
 }
 func (t *groupTransformation) Finish(id execute.DatasetID, err error) {
 	t.d.Finish(err)
-}
-
-type blockMetadata struct {
-	key    execute.PartitionKey
-	bounds execute.Bounds
-}
-
-func (m blockMetadata) Key() execute.PartitionKey {
-	return m.key
-}
-func (m blockMetadata) Bounds() execute.Bounds {
-	return m.bounds
 }

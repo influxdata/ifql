@@ -139,16 +139,15 @@ func createCovarianceTransformation(id execute.DatasetID, mode execute.Accumulat
 	}
 	cache := execute.NewBlockBuilderCache(a.Allocator())
 	d := execute.NewDataset(id, mode, cache)
-	t := NewCovarianceTransformation(d, cache, s, a.Bounds())
+	t := NewCovarianceTransformation(d, cache, s)
 	return t, d, nil
 }
 
-func NewCovarianceTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *CovarianceProcedureSpec, bounds execute.Bounds) *CovarianceTransformation {
+func NewCovarianceTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *CovarianceProcedureSpec) *CovarianceTransformation {
 	return &CovarianceTransformation{
-		d:      d,
-		cache:  cache,
-		bounds: bounds,
-		spec:   *spec,
+		d:     d,
+		cache: cache,
+		spec:  *spec,
 	}
 }
 
@@ -158,15 +157,15 @@ func (t *CovarianceTransformation) RetractBlock(id execute.DatasetID, key execut
 
 func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	cols := b.Cols()
-	builder, new := t.cache.BlockBuilder(blockMetadata{
-		bounds: t.bounds,
-		key:    b.Key(),
-	})
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
-	timeIdx := builder.AddCol(execute.TimeCol)
-	execute.AddBlockKeyCols(b, builder)
+	builder.AddCol(execute.ColMeta{
+		Label: t.spec.TimeCol,
+		Type:  execute.TTime,
+	})
+	execute.AddBlockKeyCols(b.Key(), builder)
 	valueIdx := builder.AddCol(execute.ColMeta{
 		Label: t.spec.ValueLabel,
 		Type:  execute.TFloat,
@@ -177,6 +176,10 @@ func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block
 	if cols[xIdx].Type != cols[yIdx].Type {
 		return errors.New("cannot compute the covariance between different types")
 	}
+	if err := execute.AppendAggregateTime(t.spec.TimeValue, t.spec.TimeCol, b.Key(), builder); err != nil {
+		return err
+	}
+
 	t.reset()
 	b.Do(func(cr execute.ColReader) error {
 		switch typ := cols[xIdx].Type; typ {
@@ -185,12 +188,10 @@ func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block
 		default:
 			return fmt.Errorf("covariance does not support %v", typ)
 		}
+		return nil
 	})
 
-	// Add row for aggregate values
-	builder.AppendTime(timeIdx, b.Key().ValueTime(t.spec.TimeValue))
 	builder.AppendFloat(valueIdx, t.value())
-
 	return nil
 }
 

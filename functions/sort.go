@@ -124,12 +124,12 @@ func NewSortTransformation(d execute.Dataset, cache execute.BlockBuilderCache, s
 	}
 }
 
-func (t *sortTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *sortTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *sortTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if new {
 		execute.AddBlockCols(b, builder)
 	}

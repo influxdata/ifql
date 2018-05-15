@@ -20,6 +20,7 @@ type StateTrackingOpSpec struct {
 	CountLabel    string                       `json:"count_label"`
 	DurationLabel string                       `json:"duration_label"`
 	DurationUnit  query.Duration               `json:"duration_unit"`
+	TimeCol       string                       `json:"time_col"`
 }
 
 var stateTrackingSignature = query.DefaultFunctionSignature()
@@ -104,6 +105,13 @@ func createStateTrackingOpSpec(args query.Arguments, a *query.Administration) (q
 	} else if ok {
 		spec.DurationUnit = unit
 	}
+	if label, ok, err := args.GetString("timeCol"); err != nil {
+		return nil, err
+	} else if ok {
+		spec.TimeCol = label
+	} else {
+		spec.TimeCol = execute.DefaultTimeColLabel
+	}
 
 	if spec.DurationLabel != "" && spec.DurationUnit <= 0 {
 		return nil, errors.New("state tracking duration unit must be greater than zero")
@@ -124,6 +132,7 @@ type StateTrackingProcedureSpec struct {
 	CountLabel,
 	DurationLabel string
 	DurationUnit query.Duration
+	TimeCol      string
 }
 
 func newStateTrackingProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -137,6 +146,7 @@ func newStateTrackingProcedure(qs query.OperationSpec, pa plan.Administration) (
 		CountLabel:    spec.CountLabel,
 		DurationLabel: spec.DurationLabel,
 		DurationUnit:  spec.DurationUnit,
+		TimeCol:       spec.TimeCol,
 	}, nil
 }
 
@@ -172,12 +182,11 @@ type stateTrackingTransformation struct {
 
 	fn *execute.RowPredicateFn
 
+	timeCol,
 	countLabel,
 	durationLabel string
 
 	durationUnit int64
-
-	colMap []int
 }
 
 func NewStateTrackingTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *StateTrackingProcedureSpec) (*stateTrackingTransformation, error) {
@@ -192,11 +201,12 @@ func NewStateTrackingTransformation(d execute.Dataset, cache execute.BlockBuilde
 		countLabel:    spec.CountLabel,
 		durationLabel: spec.DurationLabel,
 		durationUnit:  int64(spec.DurationUnit),
+		timeCol:       spec.TimeCol,
 	}, nil
 }
 
-func (t *stateTrackingTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *stateTrackingTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Block) error {
@@ -208,44 +218,26 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 		return err
 	}
 
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
-		return fmt.Errorf("received duplicate block bounds: %v tags: %v", b.Bounds(), b.Tags())
+		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
 
-	// Add tag columns to builder
-	for _, c := range cols {
-		nj := builder.AddCol(c)
-		if c.Common {
-			builder.SetCommonString(nj, b.Tags()[c.Label])
-		}
-	}
-
-	l := len(cols)
-	if cap(t.colMap) < l {
-		t.colMap = make([]int, l)
-		for j := range t.colMap {
-			t.colMap[j] = j
-		}
-	} else {
-		t.colMap = t.colMap[:l]
-	}
+	execute.AddBlockCols(b, builder)
 
 	var countCol, durationCol = -1, -1
 
-	// Add new value colums
+	// Add new value columns
 	if t.countLabel != "" {
 		countCol = builder.AddCol(execute.ColMeta{
 			Label: t.countLabel,
 			Type:  execute.TInt,
-			Kind:  execute.ValueColKind,
 		})
 	}
 	if t.durationLabel != "" {
 		durationCol = builder.AddCol(execute.ColMeta{
 			Label: t.durationLabel,
 			Type:  execute.TInt,
-			Kind:  execute.ValueColKind,
 		})
 	}
 
@@ -256,10 +248,13 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 		inState bool
 	)
 
+	timeIdx := execute.ColIdx(t.timeCol, b.Cols())
 	// Append modified rows
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i, tm := range ts {
-			match, err := t.fn.Eval(i, rr)
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for i := 0; i < l; i++ {
+			tm := cr.Times(timeIdx)[i]
+			match, err := t.fn.Eval(i, cr)
 			if err != nil {
 				log.Printf("failed to evaluate state count expression: %v", err)
 				continue
@@ -280,7 +275,7 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 				}
 				count++
 			}
-			execute.AppendRowForCols(i, rr, builder, cols, t.colMap)
+			execute.AppendRecord(i, cr, builder)
 			if countCol > 0 {
 				builder.AppendInt(countCol, count)
 			}
@@ -288,8 +283,8 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 				builder.AppendInt(durationCol, duration)
 			}
 		}
+		return nil
 	})
-	return nil
 }
 
 func (t *stateTrackingTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {

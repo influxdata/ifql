@@ -157,7 +157,7 @@ func (t *derivativeTransformation) RetractBlock(id execute.DatasetID, key execut
 }
 
 func (t *derivativeTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}

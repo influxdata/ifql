@@ -15,11 +15,14 @@ import (
 const WindowKind = "window"
 
 type WindowOpSpec struct {
-	Every      query.Duration    `json:"every"`
-	Period     query.Duration    `json:"period"`
-	Start      query.Time        `json:"start"`
-	Round      query.Duration    `json:"round"`
-	Triggering query.TriggerSpec `json:"triggering"`
+	Every         query.Duration    `json:"every"`
+	Period        query.Duration    `json:"period"`
+	Start         query.Time        `json:"start"`
+	Round         query.Duration    `json:"round"`
+	Triggering    query.TriggerSpec `json:"triggering"`
+	TimeCol       string            `json:"time_col"`
+	StopColLabel  string            `json:"stop_col_label"`
+	StartColLabel string            `json:"start_col_label"`
 }
 
 var infinityVar = values.NewDurationValue(math.MaxInt64)
@@ -74,6 +77,28 @@ func createWindowOpSpec(args query.Arguments, a *query.Administration) (query.Op
 		return nil, errors.New(`window function requires at least one of "every" or "period" to be set`)
 	}
 
+	if label, ok, err := args.GetString("timeCol"); err != nil {
+		return nil, err
+	} else if ok {
+		spec.TimeCol = label
+	} else {
+		spec.TimeCol = execute.DefaultTimeColLabel
+	}
+	if label, ok, err := args.GetString("startColLabel"); err != nil {
+		return nil, err
+	} else if ok {
+		spec.StartColLabel = label
+	} else {
+		spec.StartColLabel = execute.DefaultStartColLabel
+	}
+	if label, ok, err := args.GetString("stopColLabel"); err != nil {
+		return nil, err
+	} else if ok {
+		spec.StopColLabel = label
+	} else {
+		spec.StopColLabel = execute.DefaultStopColLabel
+	}
+
 	// Apply defaults
 	if !everySet {
 		spec.Every = spec.Period
@@ -95,6 +120,9 @@ func (s *WindowOpSpec) Kind() query.OperationKind {
 type WindowProcedureSpec struct {
 	Window     plan.WindowSpec
 	Triggering query.TriggerSpec
+	TimeCol,
+	StartColLabel,
+	StopColLabel string
 }
 
 func newWindowProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -109,7 +137,10 @@ func newWindowProcedure(qs query.OperationSpec, pa plan.Administration) (plan.Pr
 			Round:  s.Round,
 			Start:  s.Start,
 		},
-		Triggering: s.Triggering,
+		Triggering:    s.Triggering,
+		TimeCol:       s.TimeCol,
+		StartColLabel: s.StartColLabel,
+		StopColLabel:  s.StopColLabel,
 	}
 	if p.Triggering == nil {
 		p.Triggering = query.DefaultTrigger
@@ -144,12 +175,19 @@ func createWindowTransformation(id execute.DatasetID, mode execute.AccumulationM
 	} else {
 		start = a.ResolveTime(s.Window.Start)
 	}
-	t := NewFixedWindowTransformation(d, cache, a.Bounds(), execute.Window{
-		Every:  execute.Duration(s.Window.Every),
-		Period: execute.Duration(s.Window.Period),
-		Round:  execute.Duration(s.Window.Round),
-		Start:  start,
-	})
+	t := NewFixedWindowTransformation(
+		d,
+		cache,
+		a.Bounds(), execute.Window{
+			Every:  execute.Duration(s.Window.Every),
+			Period: execute.Duration(s.Window.Period),
+			Round:  execute.Duration(s.Window.Round),
+			Start:  start,
+		},
+		s.TimeCol,
+		s.StartColLabel,
+		s.StopColLabel,
+	)
 	return t, d, nil
 }
 
@@ -160,6 +198,10 @@ type fixedWindowTransformation struct {
 	bounds execute.Bounds
 
 	offset execute.Duration
+
+	timeCol,
+	startColLabel,
+	stopColLabel string
 }
 
 func NewFixedWindowTransformation(
@@ -167,55 +209,139 @@ func NewFixedWindowTransformation(
 	cache execute.BlockBuilderCache,
 	bounds execute.Bounds,
 	w execute.Window,
+	timeCol,
+	startColLabel,
+	stopColLabel string,
 ) execute.Transformation {
 	offset := execute.Duration(w.Start - w.Start.Truncate(w.Every))
 	return &fixedWindowTransformation{
-		d:      d,
-		cache:  cache,
-		w:      w,
-		bounds: bounds,
-		offset: offset,
+		d:             d,
+		cache:         cache,
+		w:             w,
+		bounds:        bounds,
+		offset:        offset,
+		timeCol:       timeCol,
+		startColLabel: startColLabel,
+		stopColLabel:  stopColLabel,
 	}
 }
 
-func (t *fixedWindowTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) (err error) {
-	tagKey := meta.Tags().Key()
-	t.cache.ForEachBuilder(func(bk execute.BlockKey, bld execute.BlockBuilder) {
-		if err != nil {
-			return
-		}
-		if bld.Bounds().Overlaps(meta.Bounds()) && tagKey == bld.Tags().Key() {
-			err = t.d.RetractBlock(bk)
-		}
-	})
-	return
+func (t *fixedWindowTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) (err error) {
+	panic("not implemented")
+	//tagKey := meta.Tags().Key()
+	//t.cache.ForEachBuilder(func(bk execute.BlockKey, bld execute.BlockBuilder) {
+	//	if err != nil {
+	//		return
+	//	}
+	//	if bld.Bounds().Overlaps(meta.Bounds()) && tagKey == bld.Tags().Key() {
+	//		err = t.d.RetractBlock(bk)
+	//	}
+	//})
+	//return
 }
 
 func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	cols := b.Cols()
-	valueIdx := execute.ValueIdx(cols)
-	valueCol := cols[valueIdx]
-	times := b.Times()
-	times.DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i, time := range ts {
-			bounds := t.getWindowBounds(time)
-			for _, bnds := range bounds {
-				builder, new := t.cache.BlockBuilder(blockMetadata{
-					tags:   b.Tags(),
-					bounds: bnds,
-				})
-				if new {
-					builder.AddCol(execute.TimeCol)
-					builder.AddCol(valueCol)
-					execute.AddTags(b.Tags(), builder)
-				}
-				colMap := execute.AddNewCols(b, builder)
+	timeIdx := execute.ColIdx(t.timeCol, b.Cols())
 
-				execute.AppendRow(i, rr, builder, colMap)
+	newCols := make([]execute.ColMeta, 0, len(b.Cols())+2)
+	keyCols := make([]execute.ColMeta, 0, len(b.Cols())+2)
+	keyColMap := make([]int, 0, len(b.Cols())+2)
+	startColIdx := -1
+	stopColIdx := -1
+	for j, c := range b.Cols() {
+		if c.Label == t.startColLabel {
+			startColIdx = j
+			c.Key = true
+		}
+		if c.Label == t.stopColLabel {
+			stopColIdx = j
+			c.Key = true
+		}
+		newCols = append(newCols, c)
+		if c.Key {
+			keyCols = append(keyCols, c)
+			keyColMap = append(keyColMap, j)
+		}
+	}
+	if startColIdx == -1 {
+		startColIdx = len(newCols)
+		c := execute.ColMeta{
+			Label: t.startColLabel,
+			Type:  execute.TTime,
+			Key:   true,
+		}
+		newCols = append(newCols, c)
+		keyCols = append(keyCols, c)
+		keyColMap = append(keyColMap, startColIdx)
+	}
+	if stopColIdx == -1 {
+		stopColIdx = len(newCols)
+		c := execute.ColMeta{
+			Label: t.stopColLabel,
+			Type:  execute.TTime,
+			Key:   true,
+		}
+		newCols = append(newCols, c)
+		keyCols = append(keyCols, c)
+		keyColMap = append(keyColMap, stopColIdx)
+	}
+
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for i := 0; i < l; i++ {
+			tm := cr.Times(timeIdx)[i]
+			bounds := t.getWindowBounds(tm)
+			for _, bnds := range bounds {
+				// Update key
+				cols := make([]execute.ColMeta, len(keyCols))
+				values := make([]interface{}, len(keyCols))
+				for j, c := range keyCols {
+					cols[j] = c
+					switch c.Label {
+					case t.startColLabel:
+						values[j] = bnds.Start
+					case t.stopColLabel:
+						values[j] = bnds.Start
+					default:
+						values[j] = b.Key().Value(keyColMap[j])
+					}
+				}
+				key := execute.NewPartitionKey(cols, values)
+				builder, new := t.cache.BlockBuilder(key)
+				if new {
+					for _, c := range newCols {
+						builder.AddCol(c)
+					}
+				}
+				for j, c := range builder.Cols() {
+					switch c.Label {
+					case t.startColLabel:
+						builder.AppendTime(startColIdx, bnds.Start)
+					case t.stopColLabel:
+						builder.AppendTime(stopColIdx, bnds.Stop)
+					default:
+						switch c.Type {
+						case execute.TBool:
+							builder.AppendBool(j, cr.Bools(j)[i])
+						case execute.TInt:
+							builder.AppendInt(j, cr.Ints(j)[i])
+						case execute.TUInt:
+							builder.AppendUInt(j, cr.UInts(j)[i])
+						case execute.TFloat:
+							builder.AppendFloat(j, cr.Floats(j)[i])
+						case execute.TString:
+							builder.AppendString(j, cr.Strings(j)[i])
+						case execute.TTime:
+							builder.AppendTime(j, cr.Times(j)[i])
+						default:
+							execute.PanicUnknownType(c.Type)
+						}
+					}
+				}
 			}
 		}
+		return nil
 	})
-	return nil
 }
 
 func (t *fixedWindowTransformation) getWindowBounds(now execute.Time) []execute.Bounds {

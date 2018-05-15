@@ -2,7 +2,6 @@ package functions
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"sort"
 	"sync"
@@ -181,7 +180,7 @@ func createMergeJoinTransformation(id execute.DatasetID, mode execute.Accumulati
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "invalid expression")
 	}
-	cache := NewMergeJoinCache(joinFn, a.Allocator(), leftName, rightName)
+	cache := NewMergeJoinCache(joinFn, a.Allocator(), leftName, rightName, s.On)
 	d := execute.NewDataset(id, mode, cache)
 	t := NewMergeJoinTransformation(d, cache, s, parents, tableNames)
 	return t, d, nil
@@ -242,72 +241,54 @@ func (t *mergeJoinTransformation) Process(id execute.DatasetID, b execute.Block)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	bm := blockMetadata{
-		tags:   b.Tags().IntersectingSubset(t.keys),
-		bounds: b.Bounds(),
-	}
-	tables := t.cache.Tables(bm)
+	key := b.Key().Intersect(t.keys)
+	tables := t.cache.Tables(key)
 
+	var references []string
 	var table execute.BlockBuilder
 	switch id {
 	case t.leftID:
 		table = tables.left
+		references = tables.joinFn.references[t.leftName]
 	case t.rightID:
 		table = tables.right
+		references = tables.joinFn.references[t.rightName]
 	}
 
-	colMap := t.addNewCols(b, table)
-
-	times := b.Times()
-	times.DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i := range ts {
-			execute.AppendRow(i, rr, table, colMap)
+	// Add columns to table
+	diff := b.Key().Diff(t.keys)
+	labels := unionStrs(diff, references)
+	colMap := make([]int, len(labels))
+	for _, label := range labels {
+		blockIdx := execute.ColIdx(label, b.Cols())
+		// Only add the column if it does not already exist
+		builderIdx := execute.ColIdx(label, table.Cols())
+		if builderIdx < 0 {
+			builderIdx = table.AddCol(b.Cols()[blockIdx])
 		}
-	})
+		colMap[builderIdx] = blockIdx
+	}
+
+	execute.AppendBlock(b, table, colMap)
 	return nil
 }
 
-// addNewCols adds column to builder that exist on b and are part of the join keys.
-// This method ensures that the left and right tables always have the same columns.
-// A colMap is returned mapping cols of builder to cols of b.
-func (t *mergeJoinTransformation) addNewCols(b execute.Block, builder execute.BlockBuilder) []int {
-	cols := b.Cols()
-	existing := builder.Cols()
-	colMap := make([]int, len(existing))
-	for j, c := range cols {
-		// Skip common tags or tags that are not one of the join keys.
-		if c.IsTag() {
-			if c.Common {
-				continue
-			}
-			found := false
-			for _, k := range t.keys {
-				if c.Label == k {
-					found = true
-					break
-				}
-			}
-			// Column is not one of the join keys
-			if !found {
-				continue
-			}
-		}
-		// Check if column already exists
+func unionStrs(as, bs []string) []string {
+	u := make([]string, len(bs), len(as)+len(bs))
+	copy(u, bs)
+	for _, a := range as {
 		found := false
-		for ej, ec := range existing {
-			if c.Label == ec.Label {
-				colMap[ej] = j
+		for _, b := range bs {
+			if a == b {
 				found = true
 				break
 			}
 		}
-		// Add new column
 		if !found {
-			builder.AddCol(c)
-			colMap = append(colMap, j)
+			u = append(u, a)
 		}
 	}
-	return colMap
+	return u
 }
 
 func (t *mergeJoinTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {
@@ -363,8 +344,10 @@ type MergeJoinCache interface {
 }
 
 type mergeJoinCache struct {
-	data  map[execute.BlockKey]*joinTables
+	data  *execute.PartitionLookup
 	alloc *execute.Allocator
+
+	keys []string
 
 	leftName, rightName string
 
@@ -373,9 +356,10 @@ type mergeJoinCache struct {
 	joinFn *joinFunc
 }
 
-func NewMergeJoinCache(joinFn *joinFunc, a *execute.Allocator, leftName, rightName string) *mergeJoinCache {
+func NewMergeJoinCache(joinFn *joinFunc, a *execute.Allocator, leftName, rightName string, keys []string) *mergeJoinCache {
 	return &mergeJoinCache{
-		data:      make(map[execute.BlockKey]*joinTables),
+		data:      execute.NewPartitionLookup(),
+		keys:      keys,
 		joinFn:    joinFn,
 		alloc:     a,
 		leftName:  leftName,
@@ -383,49 +367,63 @@ func NewMergeJoinCache(joinFn *joinFunc, a *execute.Allocator, leftName, rightNa
 	}
 }
 
-func (c *mergeJoinCache) BlockMetadata(key execute.BlockKey) execute.BlockMetadata {
-	return c.data[key]
-}
-
-func (c *mergeJoinCache) Block(key execute.BlockKey) (execute.Block, error) {
-	return c.data[key].Join()
-}
-
-func (c *mergeJoinCache) ForEach(f func(execute.BlockKey)) {
-	for bk := range c.data {
-		f(bk)
+func (c *mergeJoinCache) Block(key execute.PartitionKey) (execute.Block, error) {
+	t, ok := c.lookup(key)
+	if !ok {
+		return nil, errors.New("block not found")
 	}
+	return t.Join()
 }
 
-func (c *mergeJoinCache) ForEachWithContext(f func(execute.BlockKey, execute.Trigger, execute.BlockContext)) {
-	for bk, tables := range c.data {
+func (c *mergeJoinCache) ForEach(f func(execute.PartitionKey)) {
+	c.data.Range(func(key execute.PartitionKey, value interface{}) {
+		f(key)
+	})
+}
+
+func (c *mergeJoinCache) ForEachWithContext(f func(execute.PartitionKey, execute.Trigger, execute.BlockContext)) {
+	c.data.Range(func(key execute.PartitionKey, value interface{}) {
+		tables := value.(*joinTables)
 		bc := execute.BlockContext{
-			Bounds: tables.bounds,
-			Count:  tables.Size(),
+			Key:   key,
+			Count: tables.Size(),
 		}
-		f(bk, tables.trigger, bc)
+		f(key, tables.trigger, bc)
+	})
+}
+
+func (c *mergeJoinCache) DiscardBlock(key execute.PartitionKey) {
+	t, ok := c.lookup(key)
+	if ok {
+		t.ClearData()
 	}
 }
 
-func (c *mergeJoinCache) DiscardBlock(key execute.BlockKey) {
-	c.data[key].ClearData()
-}
-
-func (c *mergeJoinCache) ExpireBlock(key execute.BlockKey) {
-	delete(c.data, key)
+func (c *mergeJoinCache) ExpireBlock(key execute.PartitionKey) {
+	v, ok := c.data.Delete(key)
+	if ok {
+		v.(*joinTables).ClearData()
+	}
 }
 
 func (c *mergeJoinCache) SetTriggerSpec(spec query.TriggerSpec) {
 	c.triggerSpec = spec
 }
 
-func (c *mergeJoinCache) Tables(bm execute.BlockMetadata) *joinTables {
-	key := execute.ToBlockKey(bm)
-	tables := c.data[key]
-	if tables == nil {
+func (c *mergeJoinCache) lookup(key execute.PartitionKey) (*joinTables, bool) {
+	v, ok := c.data.Lookup(key)
+	if !ok {
+		return nil, false
+	}
+	return v.(*joinTables), true
+}
+
+func (c *mergeJoinCache) Tables(key execute.PartitionKey) *joinTables {
+	tables, ok := c.lookup(key)
+	if !ok {
 		tables = &joinTables{
-			tags:      bm.Tags(),
-			bounds:    bm.Bounds(),
+			keys:      c.keys,
+			key:       key,
 			alloc:     c.alloc,
 			left:      execute.NewColListBlockBuilder(c.alloc),
 			right:     execute.NewColListBlockBuilder(c.alloc),
@@ -434,16 +432,14 @@ func (c *mergeJoinCache) Tables(bm execute.BlockMetadata) *joinTables {
 			trigger:   execute.NewTriggerFromSpec(c.triggerSpec),
 			joinFn:    c.joinFn,
 		}
-		tables.left.AddCol(execute.TimeCol)
-		tables.right.AddCol(execute.TimeCol)
-		c.data[key] = tables
+		c.data.Set(key, tables)
 	}
 	return tables
 }
 
 type joinTables struct {
-	tags   execute.Tags
-	bounds execute.Bounds
+	keys []string
+	key  execute.PartitionKey
 
 	alloc *execute.Allocator
 
@@ -455,12 +451,6 @@ type joinTables struct {
 	joinFn *joinFunc
 }
 
-func (t *joinTables) Bounds() execute.Bounds {
-	return t.bounds
-}
-func (t *joinTables) Tags() execute.Tags {
-	return t.tags
-}
 func (t *joinTables) Size() int {
 	return t.left.NRows() + t.right.NRows()
 }
@@ -482,12 +472,16 @@ func (t *joinTables) Join() (execute.Block, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to prepare join function")
 	}
-	// Create a builder to the result of the join
+	// Create a builder for the result of the join
 	builder := execute.NewColListBlockBuilder(t.alloc)
-	builder.SetBounds(t.bounds)
-	builder.AddCol(execute.TimeCol)
+	// TODO(nathanielc): Does join change the partition key?
+	// Or does it simply leverage it to do an effiecient join?
+	// If you join on `_time` does that mean you want to partition on `_time`?
+	// If you join on `host` does that mean you want to partition on `host`?
+	// I think that join should not change the partition key.
+	//builder.SetKey(t.key)
 
-	// Add new value columns in sorted order
+	// Add columns from function in sorted order
 	properties := t.joinFn.Type().Properties()
 	keys := make([]string, 0, len(properties))
 	for k := range properties {
@@ -498,35 +492,24 @@ func (t *joinTables) Join() (execute.Block, error) {
 		builder.AddCol(execute.ColMeta{
 			Label: k,
 			Type:  execute.ConvertFromKind(properties[k].Kind()),
-			Kind:  execute.ValueColKind,
 		})
-	}
-
-	// Add common tags
-	execute.AddTags(t.tags, builder)
-
-	// Add non common tags
-	cols := t.left.Cols()
-	for _, c := range cols {
-		if c.IsTag() && !c.Common {
-			builder.AddCol(c)
-		}
 	}
 
 	// Now that all columns have been added, keep a reference.
 	bCols := builder.Cols()
 
 	// Determine sort order for the joining tables
-	sortOrder := make([]string, len(cols))
-	for i, c := range cols {
-		sortOrder[i] = c.Label
+	sortOrder := make([]string, len(t.keys))
+	for i, label := range t.keys {
+		sortOrder[i] = label
 	}
+	// Sort input tables
 	t.left.Sort(sortOrder, false)
 	t.right.Sort(sortOrder, false)
 
 	var (
 		leftSet, rightSet subset
-		leftKey, rightKey joinKey
+		leftKey, rightKey execute.PartitionKey
 	)
 
 	rows := map[string]int{
@@ -549,21 +532,8 @@ func (t *joinTables) Join() (execute.Block, error) {
 						return nil, errors.Wrap(err, "failed to evaluate join function")
 					}
 					for j, c := range bCols {
-						switch c.Kind {
-						case execute.TimeColKind:
-							builder.AppendTime(j, leftKey.Time)
-						case execute.TagColKind:
-							if c.Common {
-								continue
-							}
-
-							builder.AppendString(j, leftKey.Tags[c.Label])
-						case execute.ValueColKind:
-							v, _ := m.Get(c.Label)
-							execute.AppendValue(builder, j, v)
-						default:
-							log.Printf("unexpected column %v", c)
-						}
+						v, _ := m.Get(c.Label)
+						execute.AppendValue(builder, j, v)
 					}
 				}
 			}
@@ -578,12 +548,12 @@ func (t *joinTables) Join() (execute.Block, error) {
 	return builder.Block()
 }
 
-func (t *joinTables) advance(offset int, table *execute.ColListBlock) (subset, joinKey) {
+func (t *joinTables) advance(offset int, table *execute.ColListBlock) (subset, execute.PartitionKey) {
 	if n := table.NRows(); n == offset {
-		return subset{Start: n, Stop: n}, joinKey{}
+		return subset{Start: n, Stop: n}, nil
 	}
 	start := offset
-	key := rowKey(start, table)
+	key := execute.PartitionKeyForRow(start, table)
 	s := subset{Start: start}
 	offset++
 	for offset < table.NRows() && equalRowKeys(start, offset, table) {
@@ -602,59 +572,40 @@ func (s subset) Empty() bool {
 	return s.Start == s.Stop
 }
 
-func rowKey(i int, table *execute.ColListBlock) (k joinKey) {
-	k.Tags = make(map[string]string)
-	for j, c := range table.Cols() {
-		switch c.Kind {
-		case execute.TimeColKind:
-			k.Time = table.AtTime(i, j)
-		case execute.TagColKind:
-			k.Tags[c.Label] = table.AtString(i, j)
-		}
-	}
-	return
-}
-
 func equalRowKeys(x, y int, table *execute.ColListBlock) bool {
 	for j, c := range table.Cols() {
-		if c.Label == execute.TimeColLabel {
-			if table.AtTime(x, j) != table.AtTime(y, j) {
-				return false
-			}
-		} else if c.IsTag() {
-			if table.AtString(x, j) != table.AtString(y, j) {
-				return false
+		if c.Key {
+			switch c.Type {
+			case execute.TBool:
+				if xv, yv := table.Bools(j)[x], table.Bools(j)[y]; xv != yv {
+					return false
+				}
+			case execute.TInt:
+				if xv, yv := table.Ints(j)[x], table.Ints(j)[y]; xv != yv {
+					return false
+				}
+			case execute.TUInt:
+				if xv, yv := table.UInts(j)[x], table.UInts(j)[y]; xv != yv {
+					return false
+				}
+			case execute.TFloat:
+				if xv, yv := table.Floats(j)[x], table.Floats(j)[y]; xv != yv {
+					return false
+				}
+			case execute.TString:
+				if xv, yv := table.Strings(j)[x], table.Strings(j)[y]; xv != yv {
+					return false
+				}
+			case execute.TTime:
+				if xv, yv := table.Times(j)[x], table.Times(j)[y]; xv != yv {
+					return false
+				}
+			default:
+				execute.PanicUnknownType(c.Type)
 			}
 		}
 	}
 	return true
-}
-
-type joinKey struct {
-	Time execute.Time
-	Tags map[string]string
-}
-
-func (k joinKey) Equal(o joinKey) bool {
-	if k.Time == o.Time {
-		for t := range k.Tags {
-			if k.Tags[t] != o.Tags[t] {
-				return false
-			}
-		}
-		return true
-	}
-	return false
-}
-func (k joinKey) Less(o joinKey) bool {
-	if k.Time == o.Time {
-		for t := range k.Tags {
-			if k.Tags[t] != o.Tags[t] {
-				return k.Tags[t] < o.Tags[t]
-			}
-		}
-	}
-	return k.Time < o.Time
 }
 
 type joinFunc struct {
@@ -754,7 +705,7 @@ func (f *joinFunc) Eval(rows map[string]int) (values.Object, error) {
 		obj, _ := f.record.Get(tbl)
 		o := obj.(*execute.Record)
 		for _, r := range references {
-			o.Set(r, readValue(row, f.recordCols[tableCol{table: tbl, col: r}], data))
+			o.Set(r, execute.ValueForRow(row, f.recordCols[tableCol{table: tbl, col: r}], data))
 		}
 	}
 	f.scope[f.recordName] = f.record
@@ -768,25 +719,6 @@ func (f *joinFunc) Eval(rows map[string]int) (values.Object, error) {
 		return f.wrapObj, nil
 	}
 	return v.Object(), nil
-}
-
-func readValue(i, j int, table *execute.ColListBlock) values.Value {
-	cols := table.Cols()
-	switch t := cols[j].Type; t {
-	case execute.TBool:
-		return values.NewBoolValue(table.AtBool(i, j))
-	case execute.TInt:
-		return values.NewIntValue(table.AtInt(i, j))
-	case execute.TUInt:
-		return values.NewUIntValue(table.AtUInt(i, j))
-	case execute.TFloat:
-		return values.NewFloatValue(table.AtFloat(i, j))
-	case execute.TString:
-		return values.NewStringValue(table.AtString(i, j))
-	default:
-		execute.PanicUnknownType(t)
-		return nil
-	}
 }
 
 func findTableReferences(fn *semantic.FunctionExpression) map[string][]string {

@@ -2,10 +2,7 @@ package execute
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
-	"hash/fnv"
-	"math"
 	"sort"
 	"sync/atomic"
 
@@ -20,11 +17,6 @@ const (
 	DefaultValueColLabel = "_value"
 )
 
-var TimeCol = ColMeta{
-	Label: DefaultTimeColLabel,
-	Type:  TTime,
-}
-
 type PartitionKey interface {
 	Cols() []ColMeta
 
@@ -35,12 +27,111 @@ type PartitionKey interface {
 	ValueString(j int) string
 	ValueDuration(j int) Duration
 	ValueTime(j int) Time
+	Value(j int) interface{}
 
+	// Intersect returns a new PartitionKey with only columns in the list of labels.
+	Intersect(labels []string) PartitionKey
+	// Diff returns the labels that exist in list of labels but not in the key's columns.
+	Diff(labels []string) []string
 	Hash() uint64
+	Equal(o PartitionKey) bool
+	Less(o PartitionKey) bool
 	String() string
 }
 
-func PartitionKeyCompare(a, b PartitionKey) bool {
+type partitionKey struct {
+	cols    []ColMeta
+	values  []interface{}
+	hasHash bool
+	hash    uint64
+}
+
+func NewPartitionKey(cols []ColMeta, values []interface{}) PartitionKey {
+	return &partitionKey{
+		cols:   cols,
+		values: values,
+	}
+}
+
+func (k *partitionKey) Cols() []ColMeta {
+	return k.cols
+}
+func (k *partitionKey) Value(j int) interface{} {
+	return k.values[j]
+}
+func (k *partitionKey) ValueBool(j int) bool {
+	return k.values[j].(bool)
+}
+func (k *partitionKey) ValueUInt(j int) uint64 {
+	return k.values[j].(uint64)
+}
+func (k *partitionKey) ValueInt(j int) int64 {
+	return k.values[j].(int64)
+}
+func (k *partitionKey) ValueFloat(j int) float64 {
+	return k.values[j].(float64)
+}
+func (k *partitionKey) ValueString(j int) string {
+	return k.values[j].(string)
+}
+func (k *partitionKey) ValueDuration(j int) Duration {
+	return k.values[j].(Duration)
+}
+func (k *partitionKey) ValueTime(j int) Time {
+	return k.values[j].(Time)
+}
+
+func (k *partitionKey) Intersect(keys []string) PartitionKey {
+	nk := &partitionKey{
+		cols:   make([]ColMeta, 0, len(k.cols)),
+		values: make([]interface{}, 0, len(k.values)),
+	}
+	for i, c := range k.cols {
+		found := false
+		for _, label := range keys {
+			if c.Label == label {
+				found = true
+				break
+			}
+		}
+
+		if found {
+			nk.cols = append(nk.cols, c)
+			nk.values = append(nk.values, k.values[i])
+		}
+	}
+	return nk
+}
+func (k *partitionKey) Diff(labels []string) []string {
+	diff := make([]string, 0, len(labels))
+	for _, label := range labels {
+		if ColIdx(label, k.cols) < 0 {
+			diff = append(diff, label)
+		}
+	}
+	return diff
+}
+
+func (k *partitionKey) Hash() uint64 {
+	if !k.hasHash {
+		k.hasHash = true
+		k.hash = computeKeyHash(k)
+	}
+	return k.hash
+}
+
+func (k *partitionKey) Equal(o PartitionKey) bool {
+	return partitionKeyEqual(k, o)
+}
+
+func (k *partitionKey) Less(o PartitionKey) bool {
+	return partitionKeyLess(k, o)
+}
+
+func partitionKeyEqual(a, b PartitionKey) bool {
+	if a.Hash() != b.Hash() {
+		return false
+	}
 	aCols := a.Cols()
 	bCols := b.Cols()
 	if len(aCols) != len(bCols) {
@@ -80,48 +171,78 @@ func PartitionKeyCompare(a, b PartitionKey) bool {
 	return true
 }
 
-type partitionKey struct {
-	cols    []ColMeta
-	values  []interface{}
-	hasHash bool
-	hash    uint64
-}
-
-func (k *partitionKey) Cols() []ColMeta {
-	return k.cols
-}
-func (k *partitionKey) ValueBool(j int) bool {
-	return k.values[j].(bool)
-}
-func (k *partitionKey) ValueUInt(j int) uint64 {
-	return k.values[j].(uint64)
-}
-func (k *partitionKey) ValueInt(j int) int64 {
-	return k.values[j].(int64)
-}
-func (k *partitionKey) ValueFloat(j int) float64 {
-	return k.values[j].(float64)
-}
-func (k *partitionKey) ValueString(j int) string {
-	return k.values[j].(string)
-}
-func (k *partitionKey) ValueDuration(j int) Duration {
-	return k.values[j].(Duration)
-}
-func (k *partitionKey) ValueTime(j int) Time {
-	return k.values[j].(Time)
-}
-
-func (k *partitionKey) Hash() uint64 {
-	if !k.hasHash {
-		k.hasHash = true
-		k.hash = computeKeyHash(k)
+func partitionKeyLess(a, b PartitionKey) bool {
+	if a.Hash() == b.Hash() {
+		return false
 	}
-	return k.hash
+	aCols := a.Cols()
+	bCols := b.Cols()
+	if len(aCols) != len(bCols) {
+		return false
+	}
+	for j, c := range aCols {
+		if aCols[j] != bCols[j] {
+			return false
+		}
+		switch c.Type {
+		case TBool:
+			if av, bv := a.ValueBool(j), b.ValueBool(j); av != bv {
+				return av
+			}
+		case TInt:
+			if av, bv := a.ValueInt(j), b.ValueInt(j); av != bv {
+				return av < bv
+			}
+		case TUInt:
+			if av, bv := a.ValueUInt(j), b.ValueUInt(j); av != bv {
+				return av < bv
+			}
+		case TFloat:
+			if av, bv := a.ValueFloat(j), b.ValueFloat(j); av != bv {
+				return av < bv
+			}
+		case TString:
+			if av, bv := a.ValueString(j), b.ValueString(j); av != bv {
+				return av < bv
+			}
+		case TTime:
+			if av, bv := a.ValueTime(j), b.ValueTime(j); av != bv {
+				return av < bv
+			}
+		}
+	}
+	return false
 }
 
 func (k partitionKey) String() string {
 	panic("not implemented")
+}
+
+func PartitionKeyForRow(i int, cr ColReader) PartitionKey {
+	cols := cr.Cols()
+	colsCpy := make([]ColMeta, len(cols))
+	values := make([]interface{}, len(cols))
+	for j, c := range cols {
+		colsCpy[j] = c
+		switch c.Type {
+		case TBool:
+			values[j] = cr.Bools(j)[i]
+		case TInt:
+			values[j] = cr.Ints(j)[i]
+		case TUInt:
+			values[j] = cr.UInts(j)[i]
+		case TFloat:
+			values[j] = cr.Floats(j)[i]
+		case TString:
+			values[j] = cr.Strings(j)[i]
+		case TTime:
+			values[j] = cr.Times(j)[i]
+		}
+	}
+	return &partitionKey{
+		cols:   colsCpy,
+		values: values,
+	}
 }
 
 type Block interface {
@@ -189,14 +310,11 @@ func AddBlockCols(b Block, builder BlockBuilder) {
 	}
 }
 
-func AddBlockKeyCols(b Block, builder BlockBuilder) {
-	cols := b.Cols()
-	for _, c := range cols {
-		if c.Key {
-			builder.AddCol(c)
-			//TODO: Set common value regardless of type
-			//builder.SetCommonString(j, b.Tags()[c.Label])
-		}
+func AddBlockKeyCols(key PartitionKey, builder BlockBuilder) {
+	for _, c := range key.Cols() {
+		builder.AddCol(c)
+		//TODO: Set common value regardless of type
+		//builder.SetCommonString(j, b.Tags()[c.Label])
 	}
 }
 
@@ -235,29 +353,40 @@ func AppendBlock(b Block, builder BlockBuilder, colMap []int) {
 		return
 	}
 
-	cols := builder.Cols()
 	b.Do(func(cr ColReader) error {
-		for j, c := range cols {
-			nj := colMap[j]
-			switch c.Type {
-			case TBool:
-				builder.AppendBools(j, cr.Bools(nj))
-			case TInt:
-				builder.AppendInts(j, cr.Ints(nj))
-			case TUInt:
-				builder.AppendUInts(j, cr.UInts(nj))
-			case TFloat:
-				builder.AppendFloats(j, cr.Floats(nj))
-			case TString:
-				builder.AppendStrings(j, cr.Strings(nj))
-			case TTime:
-				builder.AppendTimes(j, cr.Times(nj))
-			default:
-				PanicUnknownType(c.Type)
-			}
-		}
+		AppendCols(cr, builder, colMap)
 		return nil
 	})
+}
+
+// AppendCols appends all columns from cr onto builder.
+// The colMap is a map of builder column index to cr column index.
+func AppendCols(cr ColReader, builder BlockBuilder, colMap []int) {
+	for j := range builder.Cols() {
+		AppendCol(j, colMap[j], cr, builder)
+	}
+}
+
+// AppendCol append a column from cr onto builder
+// The indexes bj and cj are builder and col reader indexes respectively.
+func AppendCol(bj, cj int, cr ColReader, builder BlockBuilder) {
+	c := cr.Cols()[cj]
+	switch c.Type {
+	case TBool:
+		builder.AppendBools(bj, cr.Bools(cj))
+	case TInt:
+		builder.AppendInts(bj, cr.Ints(cj))
+	case TUInt:
+		builder.AppendUInts(bj, cr.UInts(cj))
+	case TFloat:
+		builder.AppendFloats(bj, cr.Floats(cj))
+	case TString:
+		builder.AppendStrings(bj, cr.Strings(cj))
+	case TTime:
+		builder.AppendTimes(bj, cr.Times(cj))
+	default:
+		PanicUnknownType(c.Type)
+	}
 }
 
 func AppendRecord(i int, cr ColReader, builder BlockBuilder) {
@@ -282,6 +411,15 @@ func AppendRecord(i int, cr ColReader, builder BlockBuilder) {
 			PanicUnknownType(c.Type)
 		}
 	}
+}
+
+func ContainsStr(strs []string, str string) bool {
+	for _, s := range strs {
+		if str == s {
+			return true
+		}
+	}
+	return false
 }
 
 // AddTags add columns to the builder for the given tags.
@@ -1136,7 +1274,7 @@ type BlockBuilderCache interface {
 }
 
 type blockBuilderCache struct {
-	blocks map[uint64][]blockState
+	blocks *PartitionLookup
 	alloc  *Allocator
 
 	triggerSpec query.TriggerSpec
@@ -1144,13 +1282,12 @@ type blockBuilderCache struct {
 
 func NewBlockBuilderCache(a *Allocator) *blockBuilderCache {
 	return &blockBuilderCache{
-		blocks: make(map[uint64][]blockState),
+		blocks: NewPartitionLookup(),
 		alloc:  a,
 	}
 }
 
 type blockState struct {
-	key     PartitionKey
 	builder BlockBuilder
 	trigger Trigger
 }
@@ -1167,30 +1304,12 @@ func (d *blockBuilderCache) Block(key PartitionKey) (Block, error) {
 	return b.builder.Block()
 }
 
-func computeKeyHash(key PartitionKey) uint64 {
-	h := fnv.New64()
-	for j, c := range key.Cols() {
-		h.Write([]byte(c.Label))
-		switch c.Type {
-		case TBool:
-			if key.ValueBool(j) {
-				h.Write([]byte{1})
-			} else {
-				h.Write([]byte{0})
-			}
-		case TInt:
-			binary.Write(h, binary.BigEndian, key.ValueInt(j))
-		case TUInt:
-			binary.Write(h, binary.BigEndian, key.ValueUInt(j))
-		case TFloat:
-			binary.Write(h, binary.BigEndian, math.Float64bits(key.ValueFloat(j)))
-		case TString:
-			h.Write([]byte(key.ValueString(j)))
-		case TTime:
-			binary.Write(h, binary.BigEndian, uint64(key.ValueTime(j)))
-		}
+func (d *blockBuilderCache) lookupState(key PartitionKey) (blockState, bool) {
+	v, ok := d.blocks.Lookup(key)
+	if !ok {
+		return blockState{}, false
 	}
-	return h.Sum64()
+	return v.(blockState), true
 }
 
 // BlockBuilder will return the builder for the specified block.
@@ -1201,38 +1320,18 @@ func (d *blockBuilderCache) BlockBuilder(key PartitionKey) (BlockBuilder, bool) 
 		builder := NewColListBlockBuilder(d.alloc)
 		t := NewTriggerFromSpec(d.triggerSpec)
 		b = blockState{
-			key:     key,
 			builder: builder,
 			trigger: t,
 		}
-		d.blocks[key.Hash()] = append(d.blocks[key.Hash()], b)
+		d.blocks.Set(key, b)
 	}
 	return b.builder, !ok
 }
 
-func (d *blockBuilderCache) lookupState(key PartitionKey) (blockState, bool) {
-	h := key.Hash()
-	bs, ok := d.blocks[h]
-	if !ok {
-		return blockState{}, false
-	}
-	if len(bs) == 1 {
-		return bs[0], false
-	}
-	for _, b := range bs {
-		if PartitionKeyCompare(b.key, key) {
-			return b, false
-		}
-	}
-	return blockState{}, false
-}
-
 func (d *blockBuilderCache) ForEachBuilder(f func(PartitionKey, BlockBuilder)) {
-	for _, bs := range d.blocks {
-		for _, b := range bs {
-			f(b.key, b.builder)
-		}
-	}
+	d.blocks.Range(func(key PartitionKey, value interface{}) {
+		f(key, value.(blockState).builder)
+	})
 }
 
 func (d *blockBuilderCache) DiscardBlock(key PartitionKey) {
@@ -1241,30 +1340,26 @@ func (d *blockBuilderCache) DiscardBlock(key PartitionKey) {
 		b.builder.ClearData()
 	}
 }
+
 func (d *blockBuilderCache) ExpireBlock(key PartitionKey) {
-	b, ok := d.lookupState(key)
+	b, ok := d.blocks.Delete(key)
 	if ok {
-		b.builder.ClearData()
-		panic("not implemented")
-		//delete(d.blocks, key)
+		b.(blockState).builder.ClearData()
 	}
 }
 
 func (d *blockBuilderCache) ForEach(f func(PartitionKey)) {
-	for _, bs := range d.blocks {
-		for _, b := range bs {
-			f(b.key)
-		}
-	}
+	d.blocks.Range(func(key PartitionKey, value interface{}) {
+		f(key)
+	})
 }
 
 func (d *blockBuilderCache) ForEachWithContext(f func(PartitionKey, Trigger, BlockContext)) {
-	for _, bs := range d.blocks {
-		for _, b := range bs {
-			f(b.key, b.trigger, BlockContext{
-				Key:   b.key,
-				Count: b.builder.NRows(),
-			})
-		}
-	}
+	d.blocks.Range(func(key PartitionKey, value interface{}) {
+		b := value.(blockState)
+		f(key, b.trigger, BlockContext{
+			Key:   key,
+			Count: b.builder.NRows(),
+		})
+	})
 }

@@ -134,7 +134,7 @@ func (t *differenceTransformation) RetractBlock(id execute.DatasetID, key execut
 }
 
 func (t *differenceTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
@@ -219,8 +219,6 @@ func (t *differenceTransformation) Process(id execute.DatasetID, b execute.Block
 		firstIdx = 0
 		return nil
 	})
-
-	return nil
 }
 
 func (t *differenceTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {

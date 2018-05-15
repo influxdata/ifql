@@ -748,7 +748,11 @@ All aggregate operations have the following properties:
     columns specifies a list of columns to aggregate.
 * `timeValue` string
     timeValue specifies which time value to use on the resulting aggregate record.
-    The value must be one of `_start`, or `_stop`.
+    The value must be column with type `time` and must be part of the partition key.
+    Defaults to `_stop`.
+* `timeCol` string
+    timeCol is the label to use for the resulting aggregate record.
+    Defaults to `_time`.
 
 [IMPL#294](https://github.com/influxdata/ifql/issues/294) Remove concept of Kind from table columns
 

@@ -3,6 +3,7 @@ package functions
 import (
 	"fmt"
 	"log"
+	"sort"
 
 	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
@@ -111,8 +112,8 @@ func NewMapTransformation(d execute.Dataset, cache execute.BlockBuilderCache, sp
 	}, nil
 }
 
-func (t *mapTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *mapTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *mapTransformation) Process(id execute.DatasetID, b execute.Block) error {
@@ -124,62 +125,39 @@ func (t *mapTransformation) Process(id execute.DatasetID, b execute.Block) error
 		return err
 	}
 
-	builder, new := t.cache.BlockBuilder(b)
-	if !new {
-		return fmt.Errorf("received duplicate block bounds: %v tags: %v", b.Bounds(), b.Tags())
-	}
-
-	// Add tag columns to builder
-	colMap := make([]int, 0, len(cols))
-	for j, c := range cols {
-		if !c.IsValue() {
-			nj := builder.AddCol(c)
-			if c.Common {
-				builder.SetCommonString(nj, b.Tags()[c.Label])
-			}
-			colMap = append(colMap, j)
-		}
-	}
-
-	mapType := t.fn.Type()
-	// Add new value columns
-	for k, t := range mapType.Properties() {
-		builder.AddCol(execute.ColMeta{
-			Label: k,
-			Type:  execute.ConvertFromKind(t.Kind()),
-			Kind:  execute.ValueColKind,
-		})
-	}
-
-	bCols := builder.Cols()
-	// Append modified rows
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i := range ts {
-			m, err := t.fn.Eval(i, rr)
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for i := 0; i < l; i++ {
+			m, err := t.fn.Eval(i, cr)
 			if err != nil {
 				log.Printf("failed to evaluate map expression: %v", err)
 				continue
 			}
-			for j, c := range bCols {
-				if c.Common {
-					// We already set the common tag values
-					continue
+			key := execute.PartitionKeyForRow(i, cr)
+			builder, new := t.cache.BlockBuilder(key)
+			if new {
+				// Add columns from function in sorted order
+				properties := t.fn.Type().Properties()
+				keys := make([]string, 0, len(properties))
+				for k := range properties {
+					keys = append(keys, k)
 				}
-				switch c.Kind {
-				case execute.TimeColKind:
-					builder.AppendTime(j, rr.AtTime(i, colMap[j]))
-				case execute.TagColKind:
-					builder.AppendString(j, rr.AtString(i, colMap[j]))
-				case execute.ValueColKind:
-					v, _ := m.Get(c.Label)
-					execute.AppendValue(builder, j, v)
-				default:
-					log.Printf("unknown column kind %v", c.Kind)
+				sort.Strings(keys)
+				for _, k := range keys {
+					builder.AddCol(execute.ColMeta{
+						Label: k,
+						Type:  execute.ConvertFromKind(properties[k].Kind()),
+					})
 				}
 			}
+			for j, c := range builder.Cols() {
+				v, _ := m.Get(c.Label)
+				execute.AppendValue(builder, j, v)
+			}
 		}
+		return nil
 	})
-	return nil
+
 }
 
 func (t *mapTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {

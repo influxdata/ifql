@@ -89,8 +89,11 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
 
-	builder.AddCol(TimeCol)
-	AddBlockKeyCols(b, builder)
+	builder.AddCol(ColMeta{
+		Label: t.config.TimeCol,
+		Type:  TTime,
+	})
+	AddBlockKeyCols(b.Key(), builder)
 
 	builderColMap := make([]int, len(t.config.Columns))
 	blockColMap := make([]int, len(t.config.Columns))
@@ -134,17 +137,9 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 		})
 		blockColMap[j] = idx
 	}
-
-	// Add row for aggregate values
-	timeIdx := ColIdx(t.config.TimeValue, b.Key().Cols())
-	if timeIdx < 0 {
-		return fmt.Errorf("timeValue column %q does not exist", t.config.TimeValue)
+	if err := AppendAggregateTime(t.config.TimeValue, t.config.TimeCol, b.Key(), builder); err != nil {
+		return err
 	}
-	timeCol := b.Key().Cols()[timeIdx]
-	if timeCol.Type != TTime {
-		return fmt.Errorf("timeValue column %q does not have type time", t.config.TimeValue)
-	}
-	builder.AppendTime(0, b.Key().ValueTime(timeIdx))
 
 	b.Do(func(cr ColReader) error {
 		for j := range t.config.Columns {
@@ -197,6 +192,29 @@ func (t *aggregateTransformation) UpdateProcessingTime(id DatasetID, pt Time) er
 }
 func (t *aggregateTransformation) Finish(id DatasetID, err error) {
 	t.d.Finish(err)
+}
+
+func AppendAggregateTime(srcTime, dstTime string, key PartitionKey, builder BlockBuilder) error {
+	srcTimeIdx := ColIdx(srcTime, key.Cols())
+	if srcTimeIdx < 0 {
+		return fmt.Errorf("timeValue column %q does not exist", srcTime)
+	}
+	srcTimeCol := key.Cols()[srcTimeIdx]
+	if srcTimeCol.Type != TTime {
+		return fmt.Errorf("timeValue column %q does not have type time", srcTime)
+	}
+
+	dstTimeIdx := ColIdx(dstTime, builder.Cols())
+	if dstTimeIdx < 0 {
+		return fmt.Errorf("timeValue column %q does not exist", dstTime)
+	}
+	dstTimeCol := builder.Cols()[dstTimeIdx]
+	if dstTimeCol.Type != TTime {
+		return fmt.Errorf("timeValue column %q does not have type time", dstTime)
+	}
+
+	builder.AppendTime(dstTimeIdx, key.ValueTime(srcTimeIdx))
+	return nil
 }
 
 type Aggregate interface {

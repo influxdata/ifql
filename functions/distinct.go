@@ -109,7 +109,7 @@ func (t *distinctTransformation) RetractBlock(id execute.DatasetID, key execute.
 }
 
 func (t *distinctTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
@@ -144,7 +144,6 @@ func (t *distinctTransformation) Process(id execute.DatasetID, b execute.Block) 
 		timeDistinct = make(map[execute.Time]bool)
 	}
 
-	cols := builder.Cols()
 	return b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()
 		for i := 0; i < l; i++ {

@@ -222,7 +222,7 @@ func (t *filterTransformation) RetractBlock(id execute.DatasetID, key execute.Pa
 }
 
 func (t *filterTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if new {
 		execute.AddBlockCols(b, builder)
 	}

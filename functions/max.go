@@ -128,7 +128,7 @@ func (s *MaxSelector) Rows() []execute.Row {
 func (s *MaxSelector) selectRow(idx int, cr execute.ColReader) {
 	// Capture row
 	if idx >= 0 {
-		s.rows = []execute.Row{execute.ReadRow(idx, rr)}
+		s.rows = []execute.Row{execute.ReadRow(idx, cr)}
 	}
 }
 
@@ -141,7 +141,7 @@ func (s *MaxIntSelector) DoInt(vs []int64, cr execute.ColReader) {
 			maxIdx = i
 		}
 	}
-	s.selectRow(maxIdx, rr)
+	s.selectRow(maxIdx, cr)
 }
 func (s *MaxUIntSelector) DoUInt(vs []uint64, cr execute.ColReader) {
 	maxIdx := -1
@@ -152,7 +152,7 @@ func (s *MaxUIntSelector) DoUInt(vs []uint64, cr execute.ColReader) {
 			maxIdx = i
 		}
 	}
-	s.selectRow(maxIdx, rr)
+	s.selectRow(maxIdx, cr)
 }
 func (s *MaxFloatSelector) DoFloat(vs []float64, cr execute.ColReader) {
 	maxIdx := -1
@@ -163,5 +163,5 @@ func (s *MaxFloatSelector) DoFloat(vs []float64, cr execute.ColReader) {
 			maxIdx = i
 		}
 	}
-	s.selectRow(maxIdx, rr)
+	s.selectRow(maxIdx, cr)
 }

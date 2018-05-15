@@ -114,90 +114,41 @@ func NewSetTransformation(
 	}
 }
 
-func (t *setTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
+func (t *setTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
 	// TODO
 	return nil
 }
 
 func (t *setTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	tags := b.Tags()
-	isCommon := false
-	if v, ok := tags[t.key]; ok {
-		isCommon = true
-		if v != t.value {
-			tags = tags.Copy()
-			tags[t.key] = t.value
+	key := b.Key()
+	if execute.ColIdx(t.key, key.Cols()) >= 0 {
+		// Update key
+		cols := make([]execute.ColMeta, len(key.Cols()))
+		values := make([]interface{}, len(key.Cols()))
+		for j, c := range key.Cols() {
+			cols[j] = c
+			values[j] = key.Value(j)
 		}
+		key = execute.NewPartitionKey(cols, values)
 	}
-	builder, new := t.cache.BlockBuilder(blockMetadata{
-		tags:   tags,
-		bounds: b.Bounds(),
-	})
+	builder, new := t.cache.BlockBuilder(key)
 	if new {
-		// Add columns
-		found := false
-		cols := b.Cols()
-		for j, c := range cols {
-			if c.Label == t.key {
-				found = true
-			}
-			builder.AddCol(c)
-			if c.IsTag() && c.Common {
-				builder.SetCommonString(j, tags[c.Label])
-			}
-		}
-		if !found {
-			builder.AddCol(execute.ColMeta{
-				Label:  t.key,
-				Type:   execute.TString,
-				Kind:   execute.TagColKind,
-				Common: isCommon,
-			})
-		}
+		execute.AddBlockCols(b, builder)
 	}
-	cols := builder.Cols()
-	setIdx := 0
-	for j, c := range cols {
-		if c.Label == t.key {
-			setIdx = j
-			break
-		}
-	}
-	timeIdx := execute.TimeIdx(cols)
-	b.Col(timeIdx).DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		builder.AppendTimes(timeIdx, ts)
-		for j, c := range cols {
-			if j == timeIdx || c.Common {
-				continue
-			}
-			for i := range ts {
-				switch c.Type {
-				case execute.TBool:
-					builder.AppendBool(j, rr.AtBool(i, j))
-				case execute.TInt:
-					builder.AppendInt(j, rr.AtInt(i, j))
-				case execute.TUInt:
-					builder.AppendUInt(j, rr.AtUInt(i, j))
-				case execute.TFloat:
-					builder.AppendFloat(j, rr.AtFloat(i, j))
-				case execute.TString:
-					// Set new value
-					var v string
-					if j == setIdx {
-						v = t.value
-					} else {
-						v = rr.AtString(i, j)
-					}
-					builder.AppendString(j, v)
-				case execute.TTime:
-					builder.AppendTime(j, rr.AtTime(i, j))
-				default:
-					execute.PanicUnknownType(c.Type)
+	idx := execute.ColIdx(t.key, b.Cols())
+	return b.Do(func(cr execute.ColReader) error {
+		for j := range cr.Cols() {
+			if j == idx {
+				l := cr.Len()
+				for i := 0; i < l; i++ {
+					builder.AppendString(j, t.value)
 				}
+			} else {
+				execute.AppendCol(idx, idx, cr, builder)
 			}
 		}
+		return nil
 	})
-	return nil
 }
 
 func (t *setTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {
