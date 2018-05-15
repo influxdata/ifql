@@ -44,10 +44,10 @@ func init() {
 		Stop:  execute.Time(time.Date(2017, 10, 10, 0, 0, 0, 0, time.UTC).UnixNano()),
 	})
 
-	normalBlockBuilder.AddCol(execute.TimeCol)
-	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultValueColLabel, Type: execute.TFloat, Kind: execute.ValueColKind})
-	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true})
-	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultTimeColLabel, Type: execute.TTime})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultValueColLabel, Type: execute.TFloat})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t1", Type: execute.TString, Common: true})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t2", Type: execute.TString, Common: false})
 
 	times := make([]execute.Time, N)
 	values := NormalData

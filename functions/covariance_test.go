@@ -156,24 +156,19 @@ func TestCovarianceOperation_Marshaling(t *testing.T) {
 
 func TestCovariance_Process(t *testing.T) {
 	testCases := []struct {
-		name   string
-		bounds execute.Bounds
-		spec   *functions.CovarianceProcedureSpec
-		data   []execute.Block
-		want   []*executetest.Block
+		name string
+		spec *functions.CovarianceProcedureSpec
+		data []execute.Block
+		want []*executetest.Block
 	}{
 		{
 			name: "variance",
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  5,
-			},
 			spec: &functions.CovarianceProcedureSpec{},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "x", Type: execute.TFloat},
+					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 1.0, 1.0},
@@ -185,8 +180,8 @@ func TestCovariance_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(5), 2.5},
@@ -195,16 +190,12 @@ func TestCovariance_Process(t *testing.T) {
 		},
 		{
 			name: "negative covariance",
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  5,
-			},
 			spec: &functions.CovarianceProcedureSpec{},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "x", Type: execute.TFloat},
+					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 1.0, 5.0},
@@ -216,8 +207,8 @@ func TestCovariance_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(5), -2.5},
@@ -226,16 +217,12 @@ func TestCovariance_Process(t *testing.T) {
 		},
 		{
 			name: "small covariance",
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  5,
-			},
 			spec: &functions.CovarianceProcedureSpec{},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "x", Type: execute.TFloat},
+					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 1.0, 1.0},
@@ -247,8 +234,8 @@ func TestCovariance_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(5), 0.5},
@@ -257,18 +244,14 @@ func TestCovariance_Process(t *testing.T) {
 		},
 		{
 			name: "pearson correlation",
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  5,
-			},
 			spec: &functions.CovarianceProcedureSpec{
 				PearsonCorrelation: true,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "x", Type: execute.TFloat},
+					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 1.0, 1.0},
@@ -280,8 +263,8 @@ func TestCovariance_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(5), 1.0},
@@ -290,18 +273,14 @@ func TestCovariance_Process(t *testing.T) {
 		},
 		{
 			name: "pearson correlation opposite",
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  5,
-			},
 			spec: &functions.CovarianceProcedureSpec{
 				PearsonCorrelation: true,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "x", Type: execute.TFloat},
+					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 1.0, 5.0},
@@ -313,8 +292,8 @@ func TestCovariance_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(5), -1.0},
@@ -330,7 +309,7 @@ func TestCovariance_Process(t *testing.T) {
 				tc.data,
 				tc.want,
 				func(d execute.Dataset, c execute.BlockBuilderCache) execute.Transformation {
-					return functions.NewCovarianceTransformation(d, c, tc.spec, tc.bounds)
+					return functions.NewCovarianceTransformation(d, c, tc.spec)
 				},
 			)
 		})

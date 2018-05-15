@@ -38,15 +38,11 @@ func TestGroup_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a", "x"},
@@ -54,15 +50,11 @@ func TestGroup_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 4.0, "b", "x"},
@@ -72,14 +64,10 @@ func TestGroup_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a"},
@@ -87,14 +75,10 @@ func TestGroup_Process(t *testing.T) {
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 4.0, "b"},
@@ -110,16 +94,12 @@ func TestGroup_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a", "m", "x"},
@@ -127,16 +107,12 @@ func TestGroup_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 4.0, "b", "m", "x"},
@@ -146,15 +122,11 @@ func TestGroup_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a", "x"},
@@ -162,15 +134,11 @@ func TestGroup_Process(t *testing.T) {
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 4.0, "b", "x"},
@@ -187,16 +155,12 @@ func TestGroup_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a", "m", "x"},
@@ -204,16 +168,12 @@ func TestGroup_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 4.0, "b", "m", "x"},
@@ -223,16 +183,12 @@ func TestGroup_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t3", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a", "x", "m"},
@@ -240,16 +196,12 @@ func TestGroup_Process(t *testing.T) {
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t3", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 4.0, "b", "x", "m"},
@@ -264,14 +216,10 @@ func TestGroup_Process(t *testing.T) {
 				By: []string{"t1"},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString, Common: false},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 2.0, "a"},
@@ -280,28 +228,20 @@ func TestGroup_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a"},
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(2), 1.0, "b"},
@@ -315,16 +255,12 @@ func TestGroup_Process(t *testing.T) {
 				Except: []string{"t2"},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-					{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString, Common: true},
+					{Label: "t2", Type: execute.TString, Common: false},
+					{Label: "t3", Type: execute.TString, Common: false},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 2.0, "a", "m", "x"},
@@ -333,30 +269,22 @@ func TestGroup_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0, "a", "x"},
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(2), 1.0, "a", "y"},
@@ -371,16 +299,12 @@ func TestGroup_Process(t *testing.T) {
 				Keep:   []string{"t2"},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-					{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString, Common: true},
+					{Label: "t2", Type: execute.TString, Common: false},
+					{Label: "t3", Type: execute.TString, Common: false},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 3.0, "a", "m", "x"},
@@ -391,16 +315,12 @@ func TestGroup_Process(t *testing.T) {
 			}},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 3.0, "a", "m", "x"},
@@ -408,16 +328,12 @@ func TestGroup_Process(t *testing.T) {
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
-						{Label: "t3", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString, Common: true},
+						{Label: "t2", Type: execute.TString, Common: false},
+						{Label: "t3", Type: execute.TString, Common: true},
 					},
 					Data: [][]interface{}{
 						{execute.Time(3), 1.0, "a", "m", "y"},
