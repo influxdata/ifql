@@ -2,6 +2,7 @@ package functions
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
@@ -148,11 +149,13 @@ func (t *shiftTransformation) Process(id execute.DatasetID, b execute.Block) err
 		}
 	}
 	key = execute.NewPartitionKey(cols, values)
+	log.Println(key)
 
 	builder, new := t.cache.BlockBuilder(key)
-	if new {
-		execute.AddBlockCols(b, builder)
+	if !new {
+		return fmt.Errorf("shift found duplicate block with key: %v", b.Key())
 	}
+	execute.AddBlockCols(b, builder)
 
 	return b.Do(func(cr execute.ColReader) error {
 		for j, c := range cr.Cols() {

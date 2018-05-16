@@ -24,6 +24,7 @@ func TestShiftOperation_Marshaling(t *testing.T) {
 
 func TestShift_Process(t *testing.T) {
 	cols := []execute.ColMeta{
+		{Label: "t1", Type: execute.TString},
 		{Label: execute.DefaultTimeColLabel, Type: execute.TTime},
 		{Label: execute.DefaultValueColLabel, Type: execute.TFloat},
 	}
@@ -37,23 +38,26 @@ func TestShift_Process(t *testing.T) {
 		{
 			name: "one block",
 			spec: &functions.ShiftProcedureSpec{
-				Shift: query.Duration(1),
+				Columns: []string{execute.DefaultTimeColLabel},
+				Shift:   query.Duration(1),
 			},
 			data: []execute.Block{
 				&executetest.Block{
+					KeyCols: []string{"t1"},
 					ColMeta: cols,
 					Data: [][]interface{}{
-						{execute.Time(1), 2.0},
-						{execute.Time(2), 1.0},
+						{"a", execute.Time(1), 2.0},
+						{"a", execute.Time(2), 1.0},
 					},
 				},
 			},
 			want: []*executetest.Block{
 				{
+					KeyCols: []string{"t1"},
 					ColMeta: cols,
 					Data: [][]interface{}{
-						{execute.Time(2), 2.0},
-						{execute.Time(3), 1.0},
+						{"a", execute.Time(2), 2.0},
+						{"a", execute.Time(3), 1.0},
 					},
 				},
 			},
@@ -61,37 +65,42 @@ func TestShift_Process(t *testing.T) {
 		{
 			name: "multiple blocks",
 			spec: &functions.ShiftProcedureSpec{
-				Shift: query.Duration(2),
+				Columns: []string{execute.DefaultTimeColLabel},
+				Shift:   query.Duration(2),
 			},
 			data: []execute.Block{
 				&executetest.Block{
+					KeyCols: []string{"t1"},
 					ColMeta: cols,
 					Data: [][]interface{}{
-						{execute.Time(1), 2.0},
-						{execute.Time(2), 1.0},
+						{"a", execute.Time(1), 2.0},
+						{"a", execute.Time(2), 1.0},
 					},
 				},
 				&executetest.Block{
+					KeyCols: []string{"t1"},
 					ColMeta: cols,
 					Data: [][]interface{}{
-						{execute.Time(3), 3.0},
-						{execute.Time(4), 4.0},
+						{"b", execute.Time(3), 3.0},
+						{"b", execute.Time(4), 4.0},
 					},
 				},
 			},
 			want: []*executetest.Block{
 				{
+					KeyCols: []string{"t1"},
 					ColMeta: cols,
 					Data: [][]interface{}{
-						{execute.Time(3), 2.0},
-						{execute.Time(4), 1.0},
+						{"a", execute.Time(3), 2.0},
+						{"a", execute.Time(4), 1.0},
 					},
 				},
 				{
+					KeyCols: []string{"t1"},
 					ColMeta: cols,
 					Data: [][]interface{}{
-						{execute.Time(5), 3.0},
-						{execute.Time(6), 4.0},
+						{"b", execute.Time(5), 3.0},
+						{"b", execute.Time(6), 4.0},
 					},
 				},
 			},
