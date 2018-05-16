@@ -125,7 +125,7 @@ func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) 
 
 	execute.AddBlockKeyCols(b.Key(), builder)
 	builder.AddCol(execute.ColMeta{
-		Label: t.spec.TimeCol,
+		Label: t.spec.TimeDst,
 		Type:  execute.TTime,
 	})
 	cols := b.Cols()
@@ -141,13 +141,13 @@ func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) 
 		}
 	}
 
-	if err := execute.AppendAggregateTime(t.spec.TimeValue, t.spec.TimeCol, b.Key(), builder); err != nil {
+	if err := execute.AppendAggregateTime(t.spec.TimeSrc, t.spec.TimeDst, b.Key(), builder); err != nil {
 		return err
 	}
 
-	timeIdx := execute.ColIdx(t.spec.TimeCol, cols)
+	timeIdx := execute.ColIdx(t.spec.TimeDst, cols)
 	if timeIdx < 0 {
-		return fmt.Errorf("no column %q exists", t.spec.TimeValue)
+		return fmt.Errorf("no column %q exists", t.spec.TimeSrc)
 	}
 	err := b.Do(func(cr execute.ColReader) error {
 		for j, in := range integrals {

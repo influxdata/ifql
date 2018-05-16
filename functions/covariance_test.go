@@ -27,11 +27,11 @@ func TestCovariance_NewQuery(t *testing.T) {
 					{
 						ID: "covariance1",
 						Spec: &functions.CovarianceOpSpec{
-							ValueLabel: execute.DefaultValueColLabel,
+							ValueDst: execute.DefaultValueColLabel,
 							AggregateConfig: execute.AggregateConfig{
-								TimeValue: execute.DefaultStopColLabel,
-								TimeCol:   execute.DefaultTimeColLabel,
-								Columns:   []string{"a", "b"},
+								TimeSrc: execute.DefaultStopColLabel,
+								TimeDst: execute.DefaultTimeColLabel,
+								Columns: []string{"a", "b"},
 							},
 						},
 					},
@@ -55,12 +55,12 @@ func TestCovariance_NewQuery(t *testing.T) {
 					{
 						ID: "covariance1",
 						Spec: &functions.CovarianceOpSpec{
-							ValueLabel:         execute.DefaultValueColLabel,
+							ValueDst:           execute.DefaultValueColLabel,
 							PearsonCorrelation: true,
 							AggregateConfig: execute.AggregateConfig{
-								TimeValue: execute.DefaultStopColLabel,
-								TimeCol:   execute.DefaultTimeColLabel,
-								Columns:   []string{"a", "b"},
+								TimeSrc: execute.DefaultStopColLabel,
+								TimeDst: execute.DefaultTimeColLabel,
+								Columns: []string{"a", "b"},
 							},
 						},
 					},
@@ -129,12 +129,12 @@ func TestCovariance_NewQuery(t *testing.T) {
 					{
 						ID: "covariance3",
 						Spec: &functions.CovarianceOpSpec{
-							ValueLabel:         execute.DefaultValueColLabel,
+							ValueDst:           execute.DefaultValueColLabel,
 							PearsonCorrelation: true,
 							AggregateConfig: execute.AggregateConfig{
-								TimeValue: execute.DefaultStopColLabel,
-								TimeCol:   execute.DefaultTimeColLabel,
-								Columns:   []string{"x", "y"},
+								TimeSrc: execute.DefaultStopColLabel,
+								TimeDst: execute.DefaultTimeColLabel,
+								Columns: []string{"x", "y"},
 							},
 						},
 					},
@@ -185,9 +185,9 @@ func TestCovariance_Process(t *testing.T) {
 			spec: &functions.CovarianceProcedureSpec{
 				ValueLabel: execute.DefaultValueColLabel,
 				AggregateConfig: execute.AggregateConfig{
-					TimeValue: execute.DefaultStopColLabel,
-					TimeCol:   execute.DefaultTimeColLabel,
-					Columns:   []string{"x", "y"},
+					TimeSrc: execute.DefaultStopColLabel,
+					TimeDst: execute.DefaultTimeColLabel,
+					Columns: []string{"x", "y"},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
@@ -225,9 +225,9 @@ func TestCovariance_Process(t *testing.T) {
 			spec: &functions.CovarianceProcedureSpec{
 				ValueLabel: execute.DefaultValueColLabel,
 				AggregateConfig: execute.AggregateConfig{
-					TimeValue: execute.DefaultStopColLabel,
-					TimeCol:   execute.DefaultTimeColLabel,
-					Columns:   []string{"x", "y"},
+					TimeSrc: execute.DefaultStopColLabel,
+					TimeDst: execute.DefaultTimeColLabel,
+					Columns: []string{"x", "y"},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
@@ -265,9 +265,9 @@ func TestCovariance_Process(t *testing.T) {
 			spec: &functions.CovarianceProcedureSpec{
 				ValueLabel: execute.DefaultValueColLabel,
 				AggregateConfig: execute.AggregateConfig{
-					TimeValue: execute.DefaultStopColLabel,
-					TimeCol:   execute.DefaultTimeColLabel,
-					Columns:   []string{"x", "y"},
+					TimeSrc: execute.DefaultStopColLabel,
+					TimeDst: execute.DefaultTimeColLabel,
+					Columns: []string{"x", "y"},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
@@ -306,9 +306,9 @@ func TestCovariance_Process(t *testing.T) {
 				ValueLabel:         execute.DefaultValueColLabel,
 				PearsonCorrelation: true,
 				AggregateConfig: execute.AggregateConfig{
-					TimeValue: execute.DefaultStopColLabel,
-					TimeCol:   execute.DefaultTimeColLabel,
-					Columns:   []string{"x", "y"},
+					TimeSrc: execute.DefaultStopColLabel,
+					TimeDst: execute.DefaultTimeColLabel,
+					Columns: []string{"x", "y"},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
@@ -347,9 +347,9 @@ func TestCovariance_Process(t *testing.T) {
 				ValueLabel:         execute.DefaultValueColLabel,
 				PearsonCorrelation: true,
 				AggregateConfig: execute.AggregateConfig{
-					TimeValue: execute.DefaultStopColLabel,
-					TimeCol:   execute.DefaultTimeColLabel,
-					Columns:   []string{"x", "y"},
+					TimeSrc: execute.DefaultStopColLabel,
+					TimeDst: execute.DefaultTimeColLabel,
+					Columns: []string{"x", "y"},
 				},
 			},
 			data: []execute.Block{&executetest.Block{

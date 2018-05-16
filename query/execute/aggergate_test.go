@@ -62,9 +62,9 @@ func TestAggregate_Process(t *testing.T) {
 		{
 			name: "single use start time",
 			config: execute.AggregateConfig{
-				Columns:   []string{execute.DefaultValueColLabel},
-				TimeValue: execute.DefaultStartColLabel,
-				TimeCol:   execute.DefaultTimeColLabel,
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeSrc: execute.DefaultStartColLabel,
+				TimeDst: execute.DefaultTimeColLabel,
 			},
 			agg: sumAgg,
 			data: []*executetest.Block{{
@@ -328,9 +328,9 @@ func TestAggregate_Process(t *testing.T) {
 		{
 			name: "multiple values",
 			config: execute.AggregateConfig{
-				Columns:   []string{"x", "y"},
-				TimeValue: execute.DefaultStopColLabel,
-				TimeCol:   execute.DefaultTimeColLabel,
+				Columns: []string{"x", "y"},
+				TimeSrc: execute.DefaultStopColLabel,
+				TimeDst: execute.DefaultTimeColLabel,
 			},
 			agg: sumAgg,
 			data: []*executetest.Block{{
@@ -372,9 +372,9 @@ func TestAggregate_Process(t *testing.T) {
 		{
 			name: "multiple values changing types",
 			config: execute.AggregateConfig{
-				Columns:   []string{"x", "y"},
-				TimeValue: execute.DefaultStopColLabel,
-				TimeCol:   execute.DefaultTimeColLabel,
+				Columns: []string{"x", "y"},
+				TimeSrc: execute.DefaultStopColLabel,
+				TimeDst: execute.DefaultTimeColLabel,
 			},
 			agg: countAgg,
 			data: []*executetest.Block{{

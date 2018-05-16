@@ -18,7 +18,7 @@ type DerivativeOpSpec struct {
 	Unit        query.Duration `json:"unit"`
 	NonNegative bool           `json:"non_negative"`
 	Columns     []string       `json:"columns"`
-	TimeCol     string         `json:"time_col"`
+	TimeSrc     string         `json:"time_src"`
 }
 
 var derivativeSignature = query.DefaultFunctionSignature()
@@ -27,7 +27,7 @@ func init() {
 	derivativeSignature.Params["unit"] = semantic.Duration
 	derivativeSignature.Params["nonNegative"] = semantic.Bool
 	derivativeSignature.Params["columns"] = semantic.NewArrayType(semantic.String)
-	derivativeSignature.Params["timeCol"] = semantic.String
+	derivativeSignature.Params["timeSrc"] = semantic.String
 
 	query.RegisterFunction(DerivativeKind, createDerivativeOpSpec, derivativeSignature)
 	query.RegisterOpSpec(DerivativeKind, newDerivativeOp)
@@ -56,12 +56,12 @@ func createDerivativeOpSpec(args query.Arguments, a *query.Administration) (quer
 	} else if ok {
 		spec.NonNegative = nn
 	}
-	if timeCol, ok, err := args.GetString("timeCol"); err != nil {
+	if timeCol, ok, err := args.GetString("timeSrc"); err != nil {
 		return nil, err
 	} else if ok {
-		spec.TimeCol = timeCol
+		spec.TimeSrc = timeCol
 	} else {
-		spec.TimeCol = execute.DefaultTimeColLabel
+		spec.TimeSrc = execute.DefaultTimeColLabel
 	}
 
 	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
@@ -103,7 +103,7 @@ func newDerivativeProcedure(qs query.OperationSpec, pa plan.Administration) (pla
 		Unit:        spec.Unit,
 		NonNegative: spec.NonNegative,
 		Columns:     spec.Columns,
-		TimeCol:     spec.TimeCol,
+		TimeCol:     spec.TimeSrc,
 	}, nil
 }
 

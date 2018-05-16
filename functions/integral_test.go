@@ -142,9 +142,9 @@ func TestIntegral_Process(t *testing.T) {
 			spec: &functions.IntegralProcedureSpec{
 				Unit: 1,
 				AggregateConfig: execute.AggregateConfig{
-					TimeCol:   execute.DefaultTimeColLabel,
-					TimeValue: execute.DefaultStopColLabel,
-					Columns:   []string{"x", "y"},
+					TimeDst: execute.DefaultTimeColLabel,
+					TimeSrc: execute.DefaultStopColLabel,
+					Columns: []string{"x", "y"},
 				},
 			},
 			data: []execute.Block{&executetest.Block{

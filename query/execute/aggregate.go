@@ -18,15 +18,15 @@ type aggregateTransformation struct {
 }
 
 type AggregateConfig struct {
-	Columns   []string `json:"columns"`
-	TimeValue string   `json:"time_value"`
-	TimeCol   string   `json:"time_col"`
+	Columns []string `json:"columns"`
+	TimeSrc string   `json:"time_src"`
+	TimeDst string   `json:"time_dst"`
 }
 
 var DefaultAggregateConfig = AggregateConfig{
-	Columns:   []string{DefaultValueColLabel},
-	TimeValue: DefaultStopColLabel,
-	TimeCol:   DefaultTimeColLabel,
+	Columns: []string{DefaultValueColLabel},
+	TimeSrc: DefaultStopColLabel,
+	TimeDst: DefaultTimeColLabel,
 }
 
 func (c AggregateConfig) Copy() AggregateConfig {
@@ -39,20 +39,20 @@ func (c AggregateConfig) Copy() AggregateConfig {
 }
 
 func (c *AggregateConfig) ReadArgs(args query.Arguments) error {
-	if timeCol, ok, err := args.GetString("timeCol"); err != nil {
+	if label, ok, err := args.GetString("timeDst"); err != nil {
 		return err
 	} else if ok {
-		c.TimeCol = timeCol
+		c.TimeDst = label
 	} else {
-		c.TimeCol = DefaultAggregateConfig.TimeCol
+		c.TimeDst = DefaultAggregateConfig.TimeDst
 	}
 
-	if timeValue, ok, err := args.GetString("timeValue"); err != nil {
+	if timeValue, ok, err := args.GetString("timeSrc"); err != nil {
 		return err
 	} else if ok {
-		c.TimeValue = timeValue
+		c.TimeSrc = timeValue
 	} else {
-		c.TimeValue = DefaultAggregateConfig.TimeValue
+		c.TimeSrc = DefaultAggregateConfig.TimeSrc
 	}
 
 	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
@@ -97,7 +97,7 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 
 	AddBlockKeyCols(b.Key(), builder)
 	builder.AddCol(ColMeta{
-		Label: t.config.TimeCol,
+		Label: t.config.TimeDst,
 		Type:  TTime,
 	})
 
@@ -143,7 +143,7 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 		})
 		blockColMap[j] = idx
 	}
-	if err := AppendAggregateTime(t.config.TimeValue, t.config.TimeCol, b.Key(), builder); err != nil {
+	if err := AppendAggregateTime(t.config.TimeSrc, t.config.TimeDst, b.Key(), builder); err != nil {
 		return err
 	}
 

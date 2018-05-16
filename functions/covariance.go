@@ -15,7 +15,7 @@ const CovarianceKind = "covariance"
 
 type CovarianceOpSpec struct {
 	PearsonCorrelation bool   `json:"pearsonr"`
-	ValueLabel         string `json:"value_label"`
+	ValueDst           string `json:"value_dst"`
 	execute.AggregateConfig
 }
 
@@ -58,13 +58,13 @@ func createCovarianceOpSpec(args query.Arguments, a *query.Administration) (quer
 		spec.PearsonCorrelation = pearsonr
 	}
 
-	label, ok, err := args.GetString("valueLabel")
+	label, ok, err := args.GetString("valueDst")
 	if err != nil {
 		return nil, err
 	} else if ok {
-		spec.ValueLabel = label
+		spec.ValueDst = label
 	} else {
-		spec.ValueLabel = execute.DefaultValueColLabel
+		spec.ValueDst = execute.DefaultValueColLabel
 	}
 
 	if err := spec.AggregateConfig.ReadArgs(args); err != nil {
@@ -98,7 +98,7 @@ func newCovarianceProcedure(qs query.OperationSpec, pa plan.Administration) (pla
 
 	return &CovarianceProcedureSpec{
 		PearsonCorrelation: spec.PearsonCorrelation,
-		ValueLabel:         spec.ValueLabel,
+		ValueLabel:         spec.ValueDst,
 		AggregateConfig:    spec.AggregateConfig,
 	}, nil
 }
@@ -163,7 +163,7 @@ func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block
 	}
 	execute.AddBlockKeyCols(b.Key(), builder)
 	builder.AddCol(execute.ColMeta{
-		Label: t.spec.TimeCol,
+		Label: t.spec.TimeDst,
 		Type:  execute.TTime,
 	})
 	valueIdx := builder.AddCol(execute.ColMeta{
@@ -176,7 +176,7 @@ func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block
 	if cols[xIdx].Type != cols[yIdx].Type {
 		return errors.New("cannot compute the covariance between different types")
 	}
-	if err := execute.AppendAggregateTime(t.spec.TimeValue, t.spec.TimeCol, b.Key(), builder); err != nil {
+	if err := execute.AppendAggregateTime(t.spec.TimeSrc, t.spec.TimeDst, b.Key(), builder); err != nil {
 		return err
 	}
 
