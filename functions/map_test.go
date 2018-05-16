@@ -209,19 +209,35 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.BinaryExpression{
-						Operator: ast.MultiplicationOperator,
-						Left: &semantic.MemberExpression{
-							Object: &semantic.IdentifierExpression{
-								Name: "r",
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
+								Value: &semantic.MemberExpression{
+									Object: &semantic.IdentifierExpression{
+										Name: "r",
+									},
+									Property: "_time",
+								},
 							},
-							Property: "_value",
-						},
-						Right: &semantic.MemberExpression{
-							Object: &semantic.IdentifierExpression{
-								Name: "r",
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.BinaryExpression{
+									Operator: ast.MultiplicationOperator,
+									Left: &semantic.MemberExpression{
+										Object: &semantic.IdentifierExpression{
+											Name: "r",
+										},
+										Property: "_value",
+									},
+									Right: &semantic.MemberExpression{
+										Object: &semantic.IdentifierExpression{
+											Name: "r",
+										},
+										Property: "_value",
+									},
+								},
 							},
-							Property: "_value",
 						},
 					},
 				},
@@ -252,18 +268,34 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.CallExpression{
-						Callee: &semantic.IdentifierExpression{Name: "float"},
-						Arguments: &semantic.ObjectExpression{
-							Properties: []*semantic.Property{{
-								Key: &semantic.Identifier{Name: "v"},
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
 								Value: &semantic.MemberExpression{
 									Object: &semantic.IdentifierExpression{
 										Name: "r",
 									},
-									Property: "_value",
+									Property: "_time",
 								},
-							}},
+							},
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.CallExpression{
+									Callee: &semantic.IdentifierExpression{Name: "float"},
+									Arguments: &semantic.ObjectExpression{
+										Properties: []*semantic.Property{{
+											Key: &semantic.Identifier{Name: "v"},
+											Value: &semantic.MemberExpression{
+												Object: &semantic.IdentifierExpression{
+													Name: "r",
+												},
+												Property: "_value",
+											},
+										}},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -294,18 +326,34 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.CallExpression{
-						Callee: &semantic.IdentifierExpression{Name: "float"},
-						Arguments: &semantic.ObjectExpression{
-							Properties: []*semantic.Property{{
-								Key: &semantic.Identifier{Name: "v"},
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
 								Value: &semantic.MemberExpression{
 									Object: &semantic.IdentifierExpression{
 										Name: "r",
 									},
-									Property: "_value",
+									Property: "_time",
 								},
-							}},
+							},
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.CallExpression{
+									Callee: &semantic.IdentifierExpression{Name: "float"},
+									Arguments: &semantic.ObjectExpression{
+										Properties: []*semantic.Property{{
+											Key: &semantic.Identifier{Name: "v"},
+											Value: &semantic.MemberExpression{
+												Object: &semantic.IdentifierExpression{
+													Name: "r",
+												},
+												Property: "_value",
+											},
+										}},
+									},
+								},
+							},
 						},
 					},
 				},

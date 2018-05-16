@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/influxdata/ifql/query"
+	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/semantic"
-	"github.com/influxdata/ifql/query/execute"
 )
 
 const RangeKind = "range"
@@ -141,21 +141,21 @@ func NewRangeTransformation(d execute.Dataset, cache execute.BlockBuilderCache, 
 		d:     d,
 		cache: cache,
 		Start: spec.Bounds.Start,
-		Stop: spec.Bounds.Stop,
+		Stop:  spec.Bounds.Stop,
 	}, nil
 }
 
-func (t *rangeTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *rangeTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *rangeTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
+	builder, new := t.cache.BlockBuilder(b.Key())
 	if new {
 		execute.AddBlockCols(b, builder)
 	}
 	cols := make([]int, len(b.Cols()))
-	for i := range(cols) {
+	for i := range cols {
 		cols[i] = i
 	}
 	execute.AppendBlock(b, builder, cols)
