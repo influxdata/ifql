@@ -167,8 +167,6 @@ type ReadSpec struct {
 	GroupKeys []string
 	// GroupExcept is the list of dimensions along which to not group
 	GroupExcept []string
-	// GroupKeep is the list of tags to keep but not group by.
-	GroupKeep []string
 }
 
 type Reader interface {

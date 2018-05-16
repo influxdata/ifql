@@ -48,9 +48,10 @@ func TestExecutor_Execute(t *testing.T) {
 						ID: plan.ProcedureIDFromOperationID("from"),
 						Spec: &testFromProcedureSource{
 							data: []execute.Block{&executetest.Block{
+								KeyCols: []string{"_start", "_stop"},
 								ColMeta: []execute.ColMeta{
-									{Label: "_start", Type: execute.TTime, Key: true},
-									{Label: "_stop", Type: execute.TTime, Key: true},
+									{Label: "_start", Type: execute.TTime},
+									{Label: "_stop", Type: execute.TTime},
 									{Label: "_time", Type: execute.TTime},
 									{Label: "_value", Type: execute.TFloat},
 								},
@@ -83,9 +84,10 @@ func TestExecutor_Execute(t *testing.T) {
 			},
 			exp: map[string][]*executetest.Block{
 				plan.DefaultYieldName: []*executetest.Block{{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -112,9 +114,10 @@ func TestExecutor_Execute(t *testing.T) {
 						ID: plan.ProcedureIDFromOperationID("from"),
 						Spec: &testFromProcedureSource{
 							data: []execute.Block{&executetest.Block{
+								KeyCols: []string{"_start", "_stop"},
 								ColMeta: []execute.ColMeta{
-									{Label: "_start", Type: execute.TTime, Key: true},
-									{Label: "_stop", Type: execute.TTime, Key: true},
+									{Label: "_start", Type: execute.TTime},
+									{Label: "_stop", Type: execute.TTime},
 									{Label: "_time", Type: execute.TTime},
 									{Label: "_value", Type: execute.TInt},
 								},
@@ -239,9 +242,10 @@ func TestExecutor_Execute(t *testing.T) {
 			},
 			exp: map[string][]*executetest.Block{
 				plan.DefaultYieldName: []*executetest.Block{{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TInt},
 					},
@@ -268,9 +272,10 @@ func TestExecutor_Execute(t *testing.T) {
 						ID: plan.ProcedureIDFromOperationID("from"),
 						Spec: &testFromProcedureSource{
 							data: []execute.Block{&executetest.Block{
+								KeyCols: []string{"_start", "_stop"},
 								ColMeta: []execute.ColMeta{
-									{Label: "_start", Type: execute.TTime, Key: true},
-									{Label: "_stop", Type: execute.TTime, Key: true},
+									{Label: "_start", Type: execute.TTime},
+									{Label: "_stop", Type: execute.TTime},
 									{Label: "_time", Type: execute.TTime},
 									{Label: "_value", Type: execute.TFloat},
 								},
@@ -317,9 +322,10 @@ func TestExecutor_Execute(t *testing.T) {
 			},
 			exp: map[string][]*executetest.Block{
 				"sum": []*executetest.Block{{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -328,9 +334,10 @@ func TestExecutor_Execute(t *testing.T) {
 					},
 				}},
 				"mean": []*executetest.Block{{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},

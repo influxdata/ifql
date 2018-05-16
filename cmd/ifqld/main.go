@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -251,37 +252,41 @@ func iterateResults(r execute.Result, f func(measurement, fieldName string, tags
 	blocks := r.Blocks()
 
 	err := blocks.Do(func(b execute.Block) error {
+		timeIdx := execute.ColIdx("_time", b.Cols())
+		if timeIdx < 0 {
+			return errors.New("missing _time column")
+		}
 
-		times := b.Times()
-		times.DoTime(func(ts []execute.Time, rr execute.RowReader) {
+		return b.Do(func(cr execute.ColReader) error {
+			ts := cr.Times(timeIdx)
 			for i, time := range ts {
 				var measurement, fieldName string
 				tags := map[string]string{}
 				var value interface{}
 
-				for j, c := range rr.Cols() {
-					if c.IsTag() {
+				for j, c := range cr.Cols() {
+					if cr.Key().HasCol(c.Label) {
 						if c.Label == "_measurement" {
-							measurement = rr.AtString(i, j)
+							measurement = cr.Strings(j)[i]
 						} else if c.Label == "_field" {
-							fieldName = rr.AtString(i, j)
+							fieldName = cr.Strings(j)[i]
 						} else {
-							tags[c.Label] = rr.AtString(i, j)
+							tags[c.Label] = cr.Strings(j)[i]
 						}
 					} else {
 						switch c.Type {
 						case execute.TBool:
-							value = rr.AtBool(i, j)
+							value = cr.Bools(j)[i]
 						case execute.TInt:
-							value = rr.AtInt(i, j)
+							value = cr.Ints(j)[i]
 						case execute.TUInt:
-							value = rr.AtUInt(i, j)
+							value = cr.UInts(j)[i]
 						case execute.TFloat:
-							value = rr.AtFloat(i, j)
+							value = cr.Floats(j)[i]
 						case execute.TString:
-							value = rr.AtString(i, j)
+							value = cr.Strings(j)[i]
 						case execute.TTime:
-							value = rr.AtTime(i, j)
+							value = cr.Times(j)[i]
 						default:
 							value = "unknown"
 						}
@@ -296,8 +301,8 @@ func iterateResults(r execute.Result, f func(measurement, fieldName string, tags
 				}
 				f(measurement, fieldName, tags, value, time.Time())
 			}
+			return nil
 		})
-		return nil
 	})
 	if err != nil {
 		log.Println("Error iterating through results:", err)
@@ -329,7 +334,15 @@ func writeJSONChunks(results map[string]execute.Result, w http.ResponseWriter) {
 			seriesID++
 
 			// output header
-			h := header{Result: name, SeriesID: seriesID, Tags: b.Tags()}
+			key := b.Key()
+			tags := make(map[string]string, len(key.Cols()))
+			for j, c := range key.Cols() {
+				if c.Type != execute.TString {
+					return fmt.Errorf("column %q is part of the key and is not a string", c.Label)
+				}
+				tags[c.Label] = key.ValueString(j)
+			}
+			h := header{Result: name, SeriesID: seriesID, Tags: tags}
 			bb, err := json.Marshal(h)
 			if err != nil {
 				return err
@@ -343,30 +356,34 @@ func writeJSONChunks(results map[string]execute.Result, w http.ResponseWriter) {
 				return err
 			}
 
-			times := b.Times()
-			times.DoTime(func(ts []execute.Time, rr execute.RowReader) {
+			timeIdx := execute.ColIdx("_time", b.Cols())
+			if timeIdx < 0 {
+				return errors.New("missing _time column")
+			}
+			return b.Do(func(cr execute.ColReader) error {
+				ts := cr.Times(timeIdx)
 				ch := chunk{Points: make([]point, len(ts))}
 				for i, time := range ts {
 					ch.Points[i].Time = time.Time().UnixNano()
 
-					for j, c := range rr.Cols() {
-						if !c.Common && c.Type == execute.TString {
+					for j, c := range cr.Cols() {
+						if !key.HasCol(c.Label) && c.Type == execute.TString {
 							if ch.Points[i].Context == nil {
 								ch.Points[i].Context = make(map[string]string)
 							}
-							ch.Points[i].Context[c.Label] = rr.AtString(i, j)
-						} else if c.IsValue() {
+							ch.Points[i].Context[c.Label] = cr.Strings(j)[i]
+						} else {
 							switch c.Type {
 							case execute.TFloat:
-								ch.Points[i].Value = rr.AtFloat(i, j)
+								ch.Points[i].Value = cr.Floats(j)[i]
 							case execute.TInt:
-								ch.Points[i].Value = rr.AtInt(i, j)
+								ch.Points[i].Value = cr.Ints(j)[i]
 							case execute.TString:
-								ch.Points[i].Value = rr.AtString(i, j)
+								ch.Points[i].Value = cr.Strings(j)[i]
 							case execute.TUInt:
-								ch.Points[i].Value = rr.AtUInt(i, j)
+								ch.Points[i].Value = cr.UInts(j)[i]
 							case execute.TBool:
-								ch.Points[i].Value = rr.AtBool(i, j)
+								ch.Points[i].Value = cr.Bools(j)[i]
 							default:
 								ch.Points[i].Value = "unknown"
 							}
@@ -377,22 +394,19 @@ func writeJSONChunks(results map[string]execute.Result, w http.ResponseWriter) {
 				// write it out
 				b, err := json.Marshal(ch)
 				if err != nil {
-					log.Println("error marshaling chunk: ", err.Error())
-					return
+					return err
 				}
 				_, err = w.Write(b)
 				if err != nil {
-					log.Println("error writing chunk: ", err.Error())
-					return
+					return err
 				}
 				_, err = w.Write([]byte("\n"))
 				if err != nil {
-					log.Println("error writing newline: ", err.Error())
-					return
+					return err
 				}
 				w.(http.Flusher).Flush()
+				return nil
 			})
-			return nil
 		})
 		if err != nil {
 			log.Println("Error iterating through results:", err)

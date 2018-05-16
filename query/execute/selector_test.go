@@ -25,9 +25,10 @@ func TestRowSelector_Process(t *testing.T) {
 				Column: "_value",
 			},
 			data: []*executetest.Block{{
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_start", Type: execute.TTime, Key: true},
-					{Label: "_stop", Type: execute.TTime, Key: true},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
@@ -45,9 +46,10 @@ func TestRowSelector_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_start", Type: execute.TTime, Key: true},
-					{Label: "_stop", Type: execute.TTime, Key: true},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
@@ -62,9 +64,10 @@ func TestRowSelector_Process(t *testing.T) {
 				Column: "x",
 			},
 			data: []*executetest.Block{{
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_start", Type: execute.TTime, Key: true},
-					{Label: "_stop", Type: execute.TTime, Key: true},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "x", Type: execute.TFloat},
 				},
@@ -82,9 +85,10 @@ func TestRowSelector_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_start", Type: execute.TTime, Key: true},
-					{Label: "_stop", Type: execute.TTime, Key: true},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "x", Type: execute.TFloat},
 				},
@@ -100,9 +104,10 @@ func TestRowSelector_Process(t *testing.T) {
 			},
 			data: []*executetest.Block{
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -120,9 +125,10 @@ func TestRowSelector_Process(t *testing.T) {
 					},
 				},
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -142,9 +148,10 @@ func TestRowSelector_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -153,9 +160,10 @@ func TestRowSelector_Process(t *testing.T) {
 					},
 				},
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -208,9 +216,10 @@ func TestIndexSelector_Process(t *testing.T) {
 				Column: "_value",
 			},
 			data: []*executetest.Block{{
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_start", Type: execute.TTime, Key: true},
-					{Label: "_stop", Type: execute.TTime, Key: true},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
@@ -228,9 +237,10 @@ func TestIndexSelector_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_start", Type: execute.TTime, Key: true},
-					{Label: "_stop", Type: execute.TTime, Key: true},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
@@ -246,9 +256,10 @@ func TestIndexSelector_Process(t *testing.T) {
 			},
 			data: []*executetest.Block{
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -266,9 +277,10 @@ func TestIndexSelector_Process(t *testing.T) {
 					},
 				},
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -288,9 +300,10 @@ func TestIndexSelector_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
@@ -299,9 +312,10 @@ func TestIndexSelector_Process(t *testing.T) {
 					},
 				},
 				{
+					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_start", Type: execute.TTime, Key: true},
-						{Label: "_stop", Type: execute.TTime, Key: true},
+						{Label: "_start", Type: execute.TTime},
+						{Label: "_stop", Type: execute.TTime},
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
 					},
