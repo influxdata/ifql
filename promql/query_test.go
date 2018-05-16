@@ -184,8 +184,7 @@ func TestParsePromQL(t *testing.T) {
 					Name: "some_metric",
 				},
 				Aggregate: &Aggregate{
-					By:         true,
-					KeepCommon: true,
+					By: true,
 					Labels: []*Identifier{
 						&Identifier{
 							Name: "foo",
@@ -205,8 +204,7 @@ func TestParsePromQL(t *testing.T) {
 					Name: "some_metric",
 				},
 				Aggregate: &Aggregate{
-					By:         true,
-					KeepCommon: true,
+					By: true,
 					Labels: []*Identifier{
 						&Identifier{
 							Name: "foo",
@@ -226,8 +224,7 @@ func TestParsePromQL(t *testing.T) {
 					Name: "some_metric",
 				},
 				Aggregate: &Aggregate{
-					By:         true,
-					KeepCommon: false,
+					By: true,
 					Labels: []*Identifier{
 						&Identifier{
 							Name: "foo",
@@ -247,8 +244,7 @@ func TestParsePromQL(t *testing.T) {
 					Name: "some_metric",
 				},
 				Aggregate: &Aggregate{
-					By:         true,
-					KeepCommon: true,
+					By: true,
 					Labels: []*Identifier{
 						&Identifier{
 							Name: "foo",

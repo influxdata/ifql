@@ -250,7 +250,6 @@ AggregateOperators = CountValueOperator / BinaryAggregateOperators / UnaryAggreg
 AggregateBy = "by"i __ labels:LabelList __ keep:"keep_common"i? {
     return &Aggregate{
         By: true,
-        KeepCommon: keep != nil,
         Labels: labels.([]*Identifier),
     }, nil
 }
