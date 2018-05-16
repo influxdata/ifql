@@ -273,11 +273,11 @@ func (o orderedCols) Less(i int, j int) bool {
 		return false
 	}
 
-	// Common cols before other cols
-	if o.cols[i].Common && !o.cols[j].Common {
+	// Keyed cols before other cols
+	if o.cols[i].Key && !o.cols[j].Key {
 		return true
 	}
-	if !o.cols[i].Common && o.cols[j].Common {
+	if !o.cols[i].Key && o.cols[j].Key {
 		return false
 	}
 

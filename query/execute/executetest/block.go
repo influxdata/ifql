@@ -7,7 +7,8 @@ import (
 )
 
 type Block struct {
-	ColMeta []execute.ColMeta
+	PartitionKey execute.PartitionKey
+	ColMeta      []execute.ColMeta
 	// Data is a list of rows, i.e. Data[row][col]
 	// Each row must be a list with length equal to len(ColMeta)
 	Data [][]interface{}
@@ -20,7 +21,18 @@ func (b *Block) Cols() []execute.ColMeta {
 }
 
 func (b *Block) Key() execute.PartitionKey {
-	panic("not implemented")
+	if b.PartitionKey == nil {
+		cols := make([]execute.ColMeta, 0, len(b.ColMeta))
+		values := make([]interface{}, 0, len(b.ColMeta))
+		for j, c := range b.ColMeta {
+			if c.Key {
+				cols = append(cols, c)
+				values = append(values, b.Data[0][j])
+			}
+		}
+		b.PartitionKey = execute.NewPartitionKey(cols, values)
+	}
+	return b.PartitionKey
 }
 
 func (b *Block) Do(f func(execute.ColReader) error) error {
@@ -127,14 +139,7 @@ func (b SortedBlocks) Len() int {
 }
 
 func (b SortedBlocks) Less(i int, j int) bool {
-	panic("not implemented")
-	//	if b[i].Bnds.Stop == b[j].Bnds.Stop {
-	//		if b[i].Bnds.Start == b[j].Bnds.Start {
-	//			return b[i].Key().String() < b[j].Key().String()
-	//		}
-	//		return b[i].Bnds.Start < b[j].Bnds.Start
-	//	}
-	//	return b[i].Bnds.Stop < b[j].Bnds.Stop
+	return b[i].Key().Less(b[j].Key())
 }
 
 func (b SortedBlocks) Swap(i int, j int) {

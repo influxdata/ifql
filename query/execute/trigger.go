@@ -61,6 +61,9 @@ type afterWatermarkTrigger struct {
 
 func (t *afterWatermarkTrigger) Triggered(c TriggerContext) bool {
 	timeIdx := ColIdx(DefaultStopColLabel, c.Block.Key.Cols())
+	if timeIdx < 0 {
+		return false
+	}
 	stop := c.Block.Key.ValueTime(timeIdx)
 	if c.Watermark >= stop+Time(t.allowedLateness) {
 		t.finished = true

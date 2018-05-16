@@ -37,10 +37,6 @@ func TestLimit_Process(t *testing.T) {
 				N: 1,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
@@ -51,10 +47,6 @@ func TestLimit_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
@@ -71,10 +63,6 @@ func TestLimit_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
@@ -86,10 +74,6 @@ func TestLimit_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 3,
-						Stop:  5,
-					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
@@ -103,10 +87,6 @@ func TestLimit_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
@@ -117,10 +97,6 @@ func TestLimit_Process(t *testing.T) {
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 3,
-						Stop:  5,
-					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},

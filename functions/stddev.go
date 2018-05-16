@@ -78,28 +78,20 @@ func createStddevTransformation(id execute.DatasetID, mode execute.AccumulationM
 	return t, d, nil
 }
 
-func (a *StddevAgg) reset() {
-	a.n = 0
-	a.mean = 0
-	a.m2 = 0
-}
 func (a *StddevAgg) NewBoolAgg() execute.DoBoolAgg {
 	return nil
 }
 
 func (a *StddevAgg) NewIntAgg() execute.DoIntAgg {
-	a.reset()
-	return a
+	return new(StddevAgg)
 }
 
 func (a *StddevAgg) NewUIntAgg() execute.DoUIntAgg {
-	a.reset()
-	return a
+	return new(StddevAgg)
 }
 
 func (a *StddevAgg) NewFloatAgg() execute.DoFloatAgg {
-	a.reset()
-	return a
+	return new(StddevAgg)
 }
 
 func (a *StddevAgg) NewStringAgg() execute.DoStringAgg {

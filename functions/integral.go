@@ -122,50 +122,54 @@ func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) 
 	if !new {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
+
 	builder.AddCol(execute.ColMeta{
 		Label: t.spec.TimeCol,
 		Type:  execute.TTime,
 	})
-	execute.AddBlockKeyCols(b, builder)
-
-	if err := execute.AppendAggregateTime(t.spec.TimeValue, t.spec.TimeCol, b.Key(), builder); err != nil {
-		return err
-	}
-
 	cols := b.Cols()
 	integrals := make([]*integral, len(cols))
+	colMap := make([]int, len(cols))
 	for j, c := range cols {
 		if execute.ContainsStr(t.spec.Columns, c.Label) {
-			integrals[j] = newIntegral(t.spec.Unit)
-			builder.AddCol(execute.ColMeta{
+			integrals[j] = newIntegral(time.Duration(t.spec.Unit))
+			colMap[j] = builder.AddCol(execute.ColMeta{
 				Label: c.Label,
 				Type:  execute.TFloat,
 			})
 		}
 	}
 
+	if err := execute.AppendAggregateTime(t.spec.TimeValue, t.spec.TimeCol, b.Key(), builder); err != nil {
+		return err
+	}
+
+	timeIdx := execute.ColIdx(t.spec.TimeValue, cols)
+	if timeIdx < 0 {
+		return fmt.Errorf("no column %q exists", t.spec.TimeValue)
+	}
 	err := b.Do(func(cr execute.ColReader) error {
-		for j, c := range builder.Cols() {
+		for j := range cols {
 			in := integrals[j]
 			if in != nil {
 				l := cr.Len()
 				for i := 0; i < l; i++ {
-					in.updateFloat(t, rr.AtFloat(i, j))
+					tm := cr.Times(timeIdx)[i]
+					in.updateFloat(tm, cr.Floats(j)[i])
 				}
 			}
 		}
+		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	builder.AppendFloat(valueIdx, t.value())
-
 	for j, in := range integrals {
 		if in == nil {
 			continue
 		}
-		builder.AppendFloat(j, in.value())
+		builder.AppendFloat(colMap[j], in.value())
 	}
 
 	return nil

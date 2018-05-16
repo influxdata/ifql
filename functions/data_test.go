@@ -38,24 +38,41 @@ func init() {
 	for i := range NormalData {
 		NormalData[i] = dist.Rand()
 	}
-	normalBlockBuilder := execute.NewColListBlockBuilder(executetest.UnlimitedAllocator)
-	normalBlockBuilder.SetBounds(execute.Bounds{
-		Start: execute.Time(time.Date(2016, 10, 10, 0, 0, 0, 0, time.UTC).UnixNano()),
-		Stop:  execute.Time(time.Date(2017, 10, 10, 0, 0, 0, 0, time.UTC).UnixNano()),
-	})
+	start := execute.Time(time.Date(2016, 10, 10, 0, 0, 0, 0, time.UTC).UnixNano())
+	stop := execute.Time(time.Date(2017, 10, 10, 0, 0, 0, 0, time.UTC).UnixNano())
+	t1Value := "a"
+	key := execute.NewPartitionKey(
+		[]execute.ColMeta{
+			{Label: execute.DefaultStartColLabel, Type: execute.TTime, Key: true},
+			{Label: execute.DefaultStopColLabel, Type: execute.TTime, Key: true},
+			{Label: "t1", Type: execute.TString, Key: true},
+		},
+		[]interface{}{
+			start,
+			stop,
+			t1Value,
+		},
+	)
+	normalBlockBuilder := execute.NewColListBlockBuilder(key, executetest.UnlimitedAllocator)
 
 	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultTimeColLabel, Type: execute.TTime})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultStartColLabel, Type: execute.TTime})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultStopColLabel, Type: execute.TTime})
 	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultValueColLabel, Type: execute.TFloat})
-	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t1", Type: execute.TString, Common: true})
-	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t2", Type: execute.TString, Common: false})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t1", Type: execute.TString, Key: true})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t2", Type: execute.TString, Key: false})
 
 	times := make([]execute.Time, N)
+	startTimes := make([]execute.Time, N)
+	stopTimes := make([]execute.Time, N)
 	values := NormalData
-	t1 := "a"
+	t1 := make([]string, N)
 	t2 := make([]string, N)
 
-	start := normalBlockBuilder.Bounds().Start
 	for i, v := range values {
+		startTimes[i] = start
+		stopTimes[i] = stop
+		t1[i] = t1Value
 		// There are roughly 1 million, 31 second intervals in a year.
 		times[i] = start + execute.Time(time.Duration(i*31)*time.Second)
 		// Pick t2 based off the value
@@ -70,9 +87,11 @@ func init() {
 	}
 
 	normalBlockBuilder.AppendTimes(0, times)
-	normalBlockBuilder.AppendFloats(1, values)
-	normalBlockBuilder.SetCommonString(2, t1)
-	normalBlockBuilder.AppendStrings(3, t2)
+	normalBlockBuilder.AppendTimes(1, startTimes)
+	normalBlockBuilder.AppendTimes(2, stopTimes)
+	normalBlockBuilder.AppendFloats(3, values)
+	normalBlockBuilder.AppendStrings(4, t1)
+	normalBlockBuilder.AppendStrings(5, t2)
 
 	NormalBlock, _ = normalBlockBuilder.Block()
 }

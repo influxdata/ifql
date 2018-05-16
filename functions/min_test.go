@@ -11,12 +11,12 @@ import (
 )
 
 func TestMinOperation_Marshaling(t *testing.T) {
-	data := []byte(`{"id":"min","kind":"min","spec":{"useRowTime":true}}`)
+	data := []byte(`{"id":"min","kind":"min","spec":{"column":"min"}}`)
 	op := &query.Operation{
 		ID: "min",
 		Spec: &functions.MinOpSpec{
 			SelectorConfig: execute.SelectorConfig{
-				UseRowTime: true,
+				Column: "min",
 			},
 		},
 	}
@@ -34,10 +34,10 @@ func TestMin_Process(t *testing.T) {
 			name: "first",
 			data: &executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString, Key: true},
+					{Label: "t2", Type: execute.TString, Key: false},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 0.0, "a", "y"},
@@ -60,10 +60,10 @@ func TestMin_Process(t *testing.T) {
 			name: "last",
 			data: &executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString, Key: true},
+					{Label: "t2", Type: execute.TString, Key: false},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 7.0, "a", "y"},
@@ -86,10 +86,10 @@ func TestMin_Process(t *testing.T) {
 			name: "middle",
 			data: &executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString, Key: true},
+					{Label: "t2", Type: execute.TString, Key: false},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 7.0, "a", "y"},

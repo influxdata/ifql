@@ -15,28 +15,7 @@ func TestCovariance_NewQuery(t *testing.T) {
 	tests := []querytest.NewQueryTestCase{
 		{
 			Name: "simple covariance",
-			Raw:  `from(db:"mydb") |> covariance()`,
-			Want: &query.Spec{
-				Operations: []*query.Operation{
-					{
-						ID: "from0",
-						Spec: &functions.FromOpSpec{
-							Database: "mydb",
-						},
-					},
-					{
-						ID:   "covariance1",
-						Spec: &functions.CovarianceOpSpec{},
-					},
-				},
-				Edges: []query.Edge{
-					{Parent: "from0", Child: "covariance1"},
-				},
-			},
-		},
-		{
-			Name: "pearsonr",
-			Raw:  `from(db:"mydb")|>covariance(pearsonr:true)`,
+			Raw:  `from(db:"mydb") |> covariance(columns:["a","b"],)`,
 			Want: &query.Spec{
 				Operations: []*query.Operation{
 					{
@@ -48,7 +27,41 @@ func TestCovariance_NewQuery(t *testing.T) {
 					{
 						ID: "covariance1",
 						Spec: &functions.CovarianceOpSpec{
+							ValueLabel: execute.DefaultValueColLabel,
+							AggregateConfig: execute.AggregateConfig{
+								TimeValue: execute.DefaultStopColLabel,
+								TimeCol:   execute.DefaultTimeColLabel,
+								Columns:   []string{"a", "b"},
+							},
+						},
+					},
+				},
+				Edges: []query.Edge{
+					{Parent: "from0", Child: "covariance1"},
+				},
+			},
+		},
+		{
+			Name: "pearsonr",
+			Raw:  `from(db:"mydb")|>covariance(columns:["a","b"],pearsonr:true)`,
+			Want: &query.Spec{
+				Operations: []*query.Operation{
+					{
+						ID: "from0",
+						Spec: &functions.FromOpSpec{
+							Database: "mydb",
+						},
+					},
+					{
+						ID: "covariance1",
+						Spec: &functions.CovarianceOpSpec{
+							ValueLabel:         execute.DefaultValueColLabel,
 							PearsonCorrelation: true,
+							AggregateConfig: execute.AggregateConfig{
+								TimeValue: execute.DefaultStopColLabel,
+								TimeCol:   execute.DefaultTimeColLabel,
+								Columns:   []string{"a", "b"},
+							},
 						},
 					},
 				},
@@ -116,7 +129,13 @@ func TestCovariance_NewQuery(t *testing.T) {
 					{
 						ID: "covariance3",
 						Spec: &functions.CovarianceOpSpec{
+							ValueLabel:         execute.DefaultValueColLabel,
 							PearsonCorrelation: true,
+							AggregateConfig: execute.AggregateConfig{
+								TimeValue: execute.DefaultStopColLabel,
+								TimeCol:   execute.DefaultTimeColLabel,
+								Columns:   []string{"x", "y"},
+							},
 						},
 					},
 				},
@@ -163,82 +182,112 @@ func TestCovariance_Process(t *testing.T) {
 	}{
 		{
 			name: "variance",
-			spec: &functions.CovarianceProcedureSpec{},
+			spec: &functions.CovarianceProcedureSpec{
+				AggregateConfig: execute.AggregateConfig{
+					TimeValue: execute.DefaultStopColLabel,
+					TimeCol:   execute.DefaultTimeColLabel,
+					Columns:   []string{"x", "y"},
+				},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "x", Type: execute.TFloat},
 					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(0), 1.0, 1.0},
-					{execute.Time(1), 2.0, 2.0},
-					{execute.Time(2), 3.0, 3.0},
-					{execute.Time(3), 4.0, 4.0},
-					{execute.Time(4), 5.0, 5.0},
+					{execute.Time(0), execute.Time(5), execute.Time(0), 1.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(1), 2.0, 2.0},
+					{execute.Time(0), execute.Time(5), execute.Time(2), 3.0, 3.0},
+					{execute.Time(0), execute.Time(5), execute.Time(3), 4.0, 4.0},
+					{execute.Time(0), execute.Time(5), execute.Time(4), 5.0, 5.0},
 				},
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(5), 2.5},
+					{execute.Time(0), execute.Time(5), execute.Time(5), 2.5},
 				},
 			}},
 		},
 		{
 			name: "negative covariance",
-			spec: &functions.CovarianceProcedureSpec{},
+			spec: &functions.CovarianceProcedureSpec{
+				AggregateConfig: execute.AggregateConfig{
+					TimeValue: execute.DefaultStopColLabel,
+					TimeCol:   execute.DefaultTimeColLabel,
+					Columns:   []string{"x", "y"},
+				},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "x", Type: execute.TFloat},
 					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(0), 1.0, 5.0},
-					{execute.Time(1), 2.0, 4.0},
-					{execute.Time(2), 3.0, 3.0},
-					{execute.Time(3), 4.0, 2.0},
-					{execute.Time(4), 5.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(0), 1.0, 5.0},
+					{execute.Time(0), execute.Time(5), execute.Time(1), 2.0, 4.0},
+					{execute.Time(0), execute.Time(5), execute.Time(2), 3.0, 3.0},
+					{execute.Time(0), execute.Time(5), execute.Time(3), 4.0, 2.0},
+					{execute.Time(0), execute.Time(5), execute.Time(4), 5.0, 1.0},
 				},
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(5), -2.5},
+					{execute.Time(0), execute.Time(5), execute.Time(5), -2.5},
 				},
 			}},
 		},
 		{
 			name: "small covariance",
-			spec: &functions.CovarianceProcedureSpec{},
+			spec: &functions.CovarianceProcedureSpec{
+				AggregateConfig: execute.AggregateConfig{
+					TimeValue: execute.DefaultStopColLabel,
+					TimeCol:   execute.DefaultTimeColLabel,
+					Columns:   []string{"x", "y"},
+				},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "x", Type: execute.TFloat},
 					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(0), 1.0, 1.0},
-					{execute.Time(1), 2.0, 1.0},
-					{execute.Time(2), 3.0, 1.0},
-					{execute.Time(3), 4.0, 1.0},
-					{execute.Time(4), 5.0, 2.0},
+					{execute.Time(0), execute.Time(5), execute.Time(0), 1.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(1), 2.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(2), 3.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(3), 4.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(4), 5.0, 2.0},
 				},
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(5), 0.5},
+					{execute.Time(0), execute.Time(5), execute.Time(5), 0.5},
 				},
 			}},
 		},
@@ -246,28 +295,37 @@ func TestCovariance_Process(t *testing.T) {
 			name: "pearson correlation",
 			spec: &functions.CovarianceProcedureSpec{
 				PearsonCorrelation: true,
+				AggregateConfig: execute.AggregateConfig{
+					TimeValue: execute.DefaultStopColLabel,
+					TimeCol:   execute.DefaultTimeColLabel,
+					Columns:   []string{"x", "y"},
+				},
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "x", Type: execute.TFloat},
 					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(0), 1.0, 1.0},
-					{execute.Time(1), 2.0, 2.0},
-					{execute.Time(2), 3.0, 3.0},
-					{execute.Time(3), 4.0, 4.0},
-					{execute.Time(4), 5.0, 5.0},
+					{execute.Time(0), execute.Time(5), execute.Time(0), 1.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(1), 2.0, 2.0},
+					{execute.Time(0), execute.Time(5), execute.Time(2), 3.0, 3.0},
+					{execute.Time(0), execute.Time(5), execute.Time(3), 4.0, 4.0},
+					{execute.Time(0), execute.Time(5), execute.Time(4), 5.0, 5.0},
 				},
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(5), 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(5), 1.0},
 				},
 			}},
 		},
@@ -275,28 +333,37 @@ func TestCovariance_Process(t *testing.T) {
 			name: "pearson correlation opposite",
 			spec: &functions.CovarianceProcedureSpec{
 				PearsonCorrelation: true,
+				AggregateConfig: execute.AggregateConfig{
+					TimeValue: execute.DefaultStopColLabel,
+					TimeCol:   execute.DefaultTimeColLabel,
+					Columns:   []string{"x", "y"},
+				},
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "x", Type: execute.TFloat},
 					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(0), 1.0, 5.0},
-					{execute.Time(1), 2.0, 4.0},
-					{execute.Time(2), 3.0, 3.0},
-					{execute.Time(3), 4.0, 2.0},
-					{execute.Time(4), 5.0, 1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(0), 1.0, 5.0},
+					{execute.Time(0), execute.Time(5), execute.Time(1), 2.0, 4.0},
+					{execute.Time(0), execute.Time(5), execute.Time(2), 3.0, 3.0},
+					{execute.Time(0), execute.Time(5), execute.Time(3), 4.0, 2.0},
+					{execute.Time(0), execute.Time(5), execute.Time(4), 5.0, 1.0},
 				},
 			}},
 			want: []*executetest.Block{{
 				ColMeta: []execute.ColMeta{
+					{Label: "_start", Type: execute.TTime, Key: true},
+					{Label: "_stop", Type: execute.TTime, Key: true},
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(5), -1.0},
+					{execute.Time(0), execute.Time(5), execute.Time(5), -1.0},
 				},
 			}},
 		},

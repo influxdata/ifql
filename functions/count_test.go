@@ -6,6 +6,7 @@ import (
 
 	"github.com/influxdata/ifql/functions"
 	"github.com/influxdata/ifql/query"
+	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/execute/executetest"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/query/plan/plantest"
@@ -39,8 +40,10 @@ func TestCount_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID:   "count2",
-						Spec: &functions.CountOpSpec{},
+						ID: "count2",
+						Spec: &functions.CountOpSpec{
+							AggregateConfig: execute.DefaultAggregateConfig,
+						},
 					},
 				},
 				Edges: []query.Edge{

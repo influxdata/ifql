@@ -13,12 +13,12 @@ import (
 )
 
 func TestLastOperation_Marshaling(t *testing.T) {
-	data := []byte(`{"id":"last","kind":"last","spec":{"useRowTime":true}}`)
+	data := []byte(`{"id":"last","kind":"last","spec":{"column":"bar"}}`)
 	op := &query.Operation{
 		ID: "last",
 		Spec: &functions.LastOpSpec{
 			SelectorConfig: execute.SelectorConfig{
-				UseRowTime: true,
+				Column: "bar",
 			},
 		},
 	}
@@ -38,8 +38,8 @@ func TestLast_Process(t *testing.T) {
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "t1", Type: execute.TString, Key: true},
+					{Label: "t2", Type: execute.TString, Key: false},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 0.0, "a", "y"},

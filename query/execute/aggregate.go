@@ -23,6 +23,12 @@ type AggregateConfig struct {
 	TimeCol   string   `json:"time_col"`
 }
 
+var DefaultAggregateConfig = AggregateConfig{
+	Columns:   []string{DefaultValueColLabel},
+	TimeValue: DefaultStopColLabel,
+	TimeCol:   DefaultTimeColLabel,
+}
+
 func (c AggregateConfig) Copy() AggregateConfig {
 	nc := c
 	if c.Columns != nil {
@@ -38,7 +44,7 @@ func (c *AggregateConfig) ReadArgs(args query.Arguments) error {
 	} else if ok {
 		c.TimeCol = timeCol
 	} else {
-		c.TimeCol = DefaultTimeColLabel
+		c.TimeCol = DefaultAggregateConfig.TimeCol
 	}
 
 	if timeValue, ok, err := args.GetString("timeValue"); err != nil {
@@ -46,7 +52,7 @@ func (c *AggregateConfig) ReadArgs(args query.Arguments) error {
 	} else if ok {
 		c.TimeValue = timeValue
 	} else {
-		c.TimeValue = DefaultStopColLabel
+		c.TimeValue = DefaultAggregateConfig.TimeValue
 	}
 
 	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
@@ -58,7 +64,7 @@ func (c *AggregateConfig) ReadArgs(args query.Arguments) error {
 		}
 		c.Columns = columns
 	} else {
-		c.Columns = []string{DefaultValueColLabel}
+		c.Columns = DefaultAggregateConfig.Columns
 	}
 	return nil
 }
@@ -86,14 +92,14 @@ func (t *aggregateTransformation) RetractBlock(id DatasetID, key PartitionKey) e
 func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 	builder, new := t.cache.BlockBuilder(b.Key())
 	if !new {
-		return fmt.Errorf("found duplicate block with key: %v", b.Key())
+		return fmt.Errorf("aggregate found duplicate block with key: %v", b.Key())
 	}
 
+	AddBlockKeyCols(b.Key(), builder)
 	builder.AddCol(ColMeta{
 		Label: t.config.TimeCol,
 		Type:  TTime,
 	})
-	AddBlockKeyCols(b.Key(), builder)
 
 	builderColMap := make([]int, len(t.config.Columns))
 	blockColMap := make([]int, len(t.config.Columns))
@@ -143,10 +149,10 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 
 	b.Do(func(cr ColReader) error {
 		for j := range t.config.Columns {
-			c := builder.Cols()[builderColMap[j]]
 			vf := aggregates[j]
 
 			tj := blockColMap[j]
+			c := b.Cols()[tj]
 
 			switch c.Type {
 			case TBool:
@@ -181,6 +187,9 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 			builder.AppendString(bj, vf.(StringValueFunc).ValueString())
 		}
 	}
+
+	AppendKeyValues(b.Key(), builder)
+
 	return nil
 }
 

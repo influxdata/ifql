@@ -22,6 +22,9 @@ func NewPartitionLookup() *PartitionLookup {
 }
 
 func (l *PartitionLookup) Lookup(key PartitionKey) (interface{}, bool) {
+	if key == nil {
+		return nil, false
+	}
 	h := key.Hash()
 	entries := l.partitions[h]
 	if len(entries) == 1 {
@@ -46,6 +49,9 @@ func (l *PartitionLookup) Set(key PartitionKey, value interface{}) {
 }
 
 func (l *PartitionLookup) Delete(key PartitionKey) (interface{}, bool) {
+	if key == nil {
+		return nil, false
+	}
 	h := key.Hash()
 	entries := l.partitions[h]
 	if len(entries) == 1 {

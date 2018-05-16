@@ -1,9 +1,9 @@
 package execute
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
+	"strings"
 	"sync/atomic"
 
 	"github.com/influxdata/ifql/query"
@@ -214,29 +214,41 @@ func partitionKeyLess(a, b PartitionKey) bool {
 	return false
 }
 
-func (k partitionKey) String() string {
-	panic("not implemented")
+func (k *partitionKey) String() string {
+	var b strings.Builder
+	b.WriteRune('{')
+	for j, c := range k.cols {
+		if j != 0 {
+			b.WriteRune(',')
+		}
+		fmt.Fprintf(&b, "%s=%v", c.Label, k.values[j])
+	}
+	b.WriteRune('}')
+	return b.String()
 }
 
 func PartitionKeyForRow(i int, cr ColReader) PartitionKey {
 	cols := cr.Cols()
-	colsCpy := make([]ColMeta, len(cols))
-	values := make([]interface{}, len(cols))
+	colsCpy := make([]ColMeta, 0, len(cols))
+	values := make([]interface{}, 0, len(cols))
 	for j, c := range cols {
-		colsCpy[j] = c
+		if !c.Key {
+			continue
+		}
+		colsCpy = append(colsCpy, c)
 		switch c.Type {
 		case TBool:
-			values[j] = cr.Bools(j)[i]
+			values = append(values, cr.Bools(j)[i])
 		case TInt:
-			values[j] = cr.Ints(j)[i]
+			values = append(values, cr.Ints(j)[i])
 		case TUInt:
-			values[j] = cr.UInts(j)[i]
+			values = append(values, cr.UInts(j)[i])
 		case TFloat:
-			values[j] = cr.Floats(j)[i]
+			values = append(values, cr.Floats(j)[i])
 		case TString:
-			values[j] = cr.Strings(j)[i]
+			values = append(values, cr.Strings(j)[i])
 		case TTime:
-			values[j] = cr.Times(j)[i]
+			values = append(values, cr.Times(j)[i])
 		}
 	}
 	return &partitionKey{
@@ -279,17 +291,13 @@ func CacheOneTimeBlock(b Block, a *Allocator) Block {
 
 // CopyBlock returns a copy of the block and is OneTimeBlock safe.
 func CopyBlock(b Block, a *Allocator) Block {
-	builder := NewColListBlockBuilder(a)
+	builder := NewColListBlockBuilder(b.Key(), a)
 
 	cols := b.Cols()
 	colMap := make([]int, len(cols))
 	for j, c := range cols {
 		colMap[j] = j
 		builder.AddCol(c)
-		// TODO Set Common for any type
-		//if c.IsTag() && c.Common {
-		//	builder.SetCommonString(j, b.Tags()[c.Label])
-		//}
 	}
 
 	AppendBlock(b, builder, colMap)
@@ -303,18 +311,12 @@ func AddBlockCols(b Block, builder BlockBuilder) {
 	cols := b.Cols()
 	for _, c := range cols {
 		builder.AddCol(c)
-		// TODO Set Common for any type
-		//if c.IsTag() && c.Common {
-		//	builder.SetCommonString(j, b.Tags()[c.Label])
-		//}
 	}
 }
 
 func AddBlockKeyCols(key PartitionKey, builder BlockBuilder) {
 	for _, c := range key.Cols() {
 		builder.AddCol(c)
-		//TODO: Set common value regardless of type
-		//builder.SetCommonString(j, b.Tags()[c.Label])
 	}
 }
 
@@ -336,11 +338,6 @@ func AddNewCols(b Block, builder BlockBuilder) []int {
 		if !found {
 			builder.AddCol(c)
 			colMap = append(colMap, j)
-
-			// TODO Set Common for any type
-			//if c.IsTag() && c.Common {
-			//	builder.SetCommonString(j, b.Tags()[c.Label])
-			//}
 		}
 	}
 	return colMap
@@ -389,11 +386,9 @@ func AppendCol(bj, cj int, cr ColReader, builder BlockBuilder) {
 	}
 }
 
+// AppendMappedRecord appends the records from cr onto builder assuming matching columns.
 func AppendRecord(i int, cr ColReader, builder BlockBuilder) {
 	for j, c := range builder.Cols() {
-		if c.Common {
-			continue
-		}
 		switch c.Type {
 		case TBool:
 			builder.AppendBool(j, cr.Bools(j)[i])
@@ -413,6 +408,50 @@ func AppendRecord(i int, cr ColReader, builder BlockBuilder) {
 	}
 }
 
+// AppendMappedRecord appends the records from cr onto builder, using colMap as a map of builder index to cr index.
+func AppendMappedRecord(i int, cr ColReader, builder BlockBuilder, colMap []int) {
+	for j, c := range builder.Cols() {
+		switch c.Type {
+		case TBool:
+			builder.AppendBool(j, cr.Bools(colMap[j])[i])
+		case TInt:
+			builder.AppendInt(j, cr.Ints(colMap[j])[i])
+		case TUInt:
+			builder.AppendUInt(j, cr.UInts(colMap[j])[i])
+		case TFloat:
+			builder.AppendFloat(j, cr.Floats(colMap[j])[i])
+		case TString:
+			builder.AppendString(j, cr.Strings(colMap[j])[i])
+		case TTime:
+			builder.AppendTime(j, cr.Times(colMap[j])[i])
+		default:
+			PanicUnknownType(c.Type)
+		}
+	}
+}
+
+func AppendKeyValues(key PartitionKey, builder BlockBuilder) {
+	for j, c := range key.Cols() {
+		idx := ColIdx(c.Label, builder.Cols())
+		switch c.Type {
+		case TBool:
+			builder.AppendBool(idx, key.ValueBool(j))
+		case TInt:
+			builder.AppendInt(idx, key.ValueInt(j))
+		case TUInt:
+			builder.AppendUInt(idx, key.ValueUInt(j))
+		case TFloat:
+			builder.AppendFloat(idx, key.ValueFloat(j))
+		case TString:
+			builder.AppendString(idx, key.ValueString(j))
+		case TTime:
+			builder.AppendTime(idx, key.ValueTime(j))
+		default:
+			PanicUnknownType(c.Type)
+		}
+	}
+}
+
 func ContainsStr(strs []string, str string) bool {
 	for _, s := range strs {
 		if str == s {
@@ -420,21 +459,6 @@ func ContainsStr(strs []string, str string) bool {
 		}
 	}
 	return false
-}
-
-// AddTags add columns to the builder for the given tags.
-// It is assumed that all tags are common to all rows of this block.
-func AddTags(t Tags, b BlockBuilder) {
-	keys := t.Keys()
-	for _, k := range keys {
-		j := b.AddCol(ColMeta{
-			Label: k,
-			Type:  TString,
-			//Kind:   TagColKind,
-			Common: true,
-		})
-		b.SetCommonString(j, t[k])
-	}
 }
 
 var NoDefaultValueColumn = fmt.Errorf("no default value column %q found.", DefaultValueColLabel)
@@ -461,8 +485,6 @@ func ColIdx(label string, cols []ColMeta) int {
 
 // BlockBuilder builds blocks that can be used multiple times
 type BlockBuilder interface {
-	SetBounds(Bounds)
-
 	Key() PartitionKey
 
 	NRows() int
@@ -481,9 +503,6 @@ type BlockBuilder interface {
 	SetFloat(i, j int, value float64)
 	SetString(i, j int, value string)
 	SetTime(i, j int, value Time)
-
-	// SetCommonString sets a single value for the entire column.
-	SetCommonString(j int, value string)
 
 	AppendBool(j int, value bool)
 	AppendInt(j int, value int64)
@@ -544,10 +563,9 @@ func (t DataType) String() string {
 }
 
 type ColMeta struct {
-	Label  string
-	Type   DataType
-	Key    bool // Key indicates that the column is part of the partition key
-	Common bool // Common indicates that the value for the column is shared by all rows.
+	Label string
+	Type  DataType
+	Key   bool // Key indicates that the column is part of the partition key
 }
 
 type BlockIterator interface {
@@ -571,120 +589,20 @@ type ColReader interface {
 	Times(j int) []Time
 }
 
-type Tags map[string]string
-
-func (t Tags) Copy() Tags {
-	nt := make(Tags, len(t))
-	for k, v := range t {
-		nt[k] = v
-	}
-	return nt
-}
-
-func (t Tags) Equal(o Tags) bool {
-	if len(t) != len(o) {
-		return false
-	}
-	for k, v := range t {
-		if o[k] != v {
-			return false
-		}
-	}
-	return true
-}
-
-func (t Tags) Keys() []string {
-	keys := make([]string, 0, len(t))
-	for k := range t {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
-type TagsKey string
-
-func (t Tags) Key() TagsKey {
-	keys := make([]string, 0, len(t))
-	for k := range t {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return TagsToKey(keys, t)
-}
-
-// Subset creates a new Tags that is a subset of t, using the list of keys.
-// If a keys is provided that does not exist on t, then a subset is not possible and
-// the boolean return value is false.
-func (t Tags) Subset(keys []string) (Tags, bool) {
-	subset := make(Tags, len(keys))
-	for _, k := range keys {
-		v, ok := t[k]
-		if !ok {
-			return nil, false
-		}
-		subset[k] = v
-	}
-	return subset, true
-}
-
-func (t Tags) IntersectingSubset(keys []string) Tags {
-	subset := make(Tags, len(keys))
-	for _, k := range keys {
-		v, ok := t[k]
-		if ok {
-			subset[k] = v
-		}
-	}
-	return subset
-}
-
-func TagsToKey(order []string, t Tags) TagsKey {
-	var buf bytes.Buffer
-	for i, k := range order {
-		if i > 0 {
-			buf.WriteRune(',')
-		}
-		buf.WriteString(k)
-		buf.WriteRune('=')
-		buf.WriteString(t[k])
-	}
-	return TagsKey(buf.String())
-}
-
-type blockMetadata struct {
-	tags   Tags
-	bounds Bounds
-}
-
-func (m blockMetadata) Tags() Tags {
-	return m.tags
-}
-func (m blockMetadata) Bounds() Bounds {
-	return m.bounds
-}
-
 type ColListBlockBuilder struct {
 	blk   *ColListBlock
 	alloc *Allocator
 }
 
-func NewColListBlockBuilder(a *Allocator) *ColListBlockBuilder {
+func NewColListBlockBuilder(key PartitionKey, a *Allocator) *ColListBlockBuilder {
 	return &ColListBlockBuilder{
-		blk:   new(ColListBlock),
+		blk:   &ColListBlock{key: key},
 		alloc: a,
 	}
 }
 
-func (b ColListBlockBuilder) SetBounds(bounds Bounds) {
-	b.blk.bounds = bounds
-}
-func (b ColListBlockBuilder) Bounds() Bounds {
-	return b.blk.bounds
-}
-
 func (b ColListBlockBuilder) Key() PartitionKey {
-	panic("not implemented")
+	return b.blk.Key()
 }
 
 func (b ColListBlockBuilder) NRows() int {
@@ -721,15 +639,9 @@ func (b ColListBlockBuilder) AddCol(c ColMeta) int {
 			alloc:   b.alloc,
 		}
 	case TString:
-		if c.Common {
-			col = &commonStrColumn{
-				ColMeta: c,
-			}
-		} else {
-			col = &stringColumn{
-				ColMeta: c,
-				alloc:   b.alloc,
-			}
+		col = &stringColumn{
+			ColMeta: c,
+			alloc:   b.alloc,
 		}
 	case TTime:
 		col = &timeColumn{
@@ -819,13 +731,6 @@ func (b ColListBlockBuilder) SetString(i int, j int, value string) {
 func (b ColListBlockBuilder) AppendString(j int, value string) {
 	meta := b.blk.cols[j].Meta()
 	CheckColType(meta, TString)
-	if meta.Common {
-		v := b.blk.cols[j].(*commonStrColumn).value
-		if value != v {
-			panic(fmt.Errorf("attempting to append a different value to the column %s, which has all common values", meta.Label))
-		}
-		return
-	}
 	col := b.blk.cols[j].(*stringColumn)
 	col.data = b.alloc.AppendStrings(col.data, value)
 	b.blk.nrows = len(col.data)
@@ -835,14 +740,6 @@ func (b ColListBlockBuilder) AppendStrings(j int, values []string) {
 	col := b.blk.cols[j].(*stringColumn)
 	col.data = b.alloc.AppendStrings(col.data, values...)
 	b.blk.nrows = len(col.data)
-}
-func (b ColListBlockBuilder) SetCommonString(j int, value string) {
-	meta := b.blk.cols[j].Meta()
-	CheckColType(meta, TString)
-	if !meta.Common {
-		panic(fmt.Errorf("cannot set common value for column %s, column is not marked as common", meta.Label))
-	}
-	b.blk.cols[j].(*commonStrColumn).value = value
 }
 
 func (b ColListBlockBuilder) SetTime(i int, j int, value Time) {
@@ -913,9 +810,7 @@ func (b ColListBlockBuilder) Sort(cols []string, desc bool) {
 // All data for the block is stored in RAM.
 // As a result At* methods are provided directly on the block for easy access.
 type ColListBlock struct {
-	bounds Bounds
-	//tags   Tags
-
+	key     PartitionKey
 	colMeta []ColMeta
 	cols    []column
 	nrows   int
@@ -932,12 +827,8 @@ func (b *ColListBlock) RefCount(n int) {
 	}
 }
 
-func (b *ColListBlock) Bounds() Bounds {
-	return b.bounds
-}
-
 func (b *ColListBlock) Key() PartitionKey {
-	panic("not implemented")
+	return b.key
 }
 func (b *ColListBlock) Cols() []ColMeta {
 	return b.colMeta
@@ -982,7 +873,7 @@ func (b *ColListBlock) Times(j int) []Time {
 
 func (b *ColListBlock) Copy() *ColListBlock {
 	cpy := new(ColListBlock)
-	cpy.bounds = b.bounds
+	cpy.key = b.key
 	cpy.nrows = b.nrows
 
 	cpy.colMeta = make([]ColMeta, len(b.colMeta))
@@ -1317,7 +1208,7 @@ func (d *blockBuilderCache) lookupState(key PartitionKey) (blockState, bool) {
 func (d *blockBuilderCache) BlockBuilder(key PartitionKey) (BlockBuilder, bool) {
 	b, ok := d.lookupState(key)
 	if !ok {
-		builder := NewColListBlockBuilder(d.alloc)
+		builder := NewColListBlockBuilder(key, d.alloc)
 		t := NewTriggerFromSpec(d.triggerSpec)
 		b = blockState{
 			builder: builder,

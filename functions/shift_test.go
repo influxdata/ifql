@@ -24,8 +24,8 @@ func TestShiftOperation_Marshaling(t *testing.T) {
 
 func TestShift_Process(t *testing.T) {
 	cols := []execute.ColMeta{
-		{Label: execute.TimeColLabel, Type: execute.TTime, Kind: execute.TimeColKind},
-		{Label: execute.DefaultValueColLabel, Type: execute.TFloat, Kind: execute.ValueColKind},
+		{Label: execute.DefaultTimeColLabel, Type: execute.TTime},
+		{Label: execute.DefaultValueColLabel, Type: execute.TFloat},
 	}
 
 	testCases := []struct {
@@ -41,7 +41,6 @@ func TestShift_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds:    execute.Bounds{Start: 1, Stop: 3},
 					ColMeta: cols,
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0},
@@ -51,7 +50,6 @@ func TestShift_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds:    execute.Bounds{Start: 2, Stop: 4},
 					ColMeta: cols,
 					Data: [][]interface{}{
 						{execute.Time(2), 2.0},
@@ -67,7 +65,6 @@ func TestShift_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds:    execute.Bounds{Start: 1, Stop: 3},
 					ColMeta: cols,
 					Data: [][]interface{}{
 						{execute.Time(1), 2.0},
@@ -75,7 +72,6 @@ func TestShift_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
-					Bnds:    execute.Bounds{Start: 3, Stop: 5},
 					ColMeta: cols,
 					Data: [][]interface{}{
 						{execute.Time(3), 3.0},
@@ -85,7 +81,6 @@ func TestShift_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds:    execute.Bounds{Start: 3, Stop: 5},
 					ColMeta: cols,
 					Data: [][]interface{}{
 						{execute.Time(3), 2.0},
@@ -93,7 +88,6 @@ func TestShift_Process(t *testing.T) {
 					},
 				},
 				{
-					Bnds:    execute.Bounds{Start: 5, Stop: 7},
 					ColMeta: cols,
 					Data: [][]interface{}{
 						{execute.Time(5), 3.0},

@@ -241,8 +241,7 @@ func (t *mergeJoinTransformation) Process(id execute.DatasetID, b execute.Block)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	key := b.Key().Intersect(t.keys)
-	tables := t.cache.Tables(key)
+	tables := t.cache.Tables(b.Key())
 
 	var references []string
 	var table execute.BlockBuilder
@@ -256,15 +255,16 @@ func (t *mergeJoinTransformation) Process(id execute.DatasetID, b execute.Block)
 	}
 
 	// Add columns to table
-	diff := b.Key().Diff(t.keys)
-	labels := unionStrs(diff, references)
+	labels := unionStrs(t.keys, references)
 	colMap := make([]int, len(labels))
 	for _, label := range labels {
 		blockIdx := execute.ColIdx(label, b.Cols())
 		// Only add the column if it does not already exist
 		builderIdx := execute.ColIdx(label, table.Cols())
 		if builderIdx < 0 {
-			builderIdx = table.AddCol(b.Cols()[blockIdx])
+			c := b.Cols()[blockIdx]
+			c.Key = execute.ContainsStr(t.keys, c.Label)
+			builderIdx = table.AddCol(c)
 		}
 		colMap[builderIdx] = blockIdx
 	}
@@ -425,8 +425,8 @@ func (c *mergeJoinCache) Tables(key execute.PartitionKey) *joinTables {
 			keys:      c.keys,
 			key:       key,
 			alloc:     c.alloc,
-			left:      execute.NewColListBlockBuilder(c.alloc),
-			right:     execute.NewColListBlockBuilder(c.alloc),
+			left:      execute.NewColListBlockBuilder(key, c.alloc),
+			right:     execute.NewColListBlockBuilder(key, c.alloc),
 			leftName:  c.leftName,
 			rightName: c.rightName,
 			trigger:   execute.NewTriggerFromSpec(c.triggerSpec),
@@ -456,8 +456,8 @@ func (t *joinTables) Size() int {
 }
 
 func (t *joinTables) ClearData() {
-	t.left = execute.NewColListBlockBuilder(t.alloc)
-	t.right = execute.NewColListBlockBuilder(t.alloc)
+	t.left = execute.NewColListBlockBuilder(t.key, t.alloc)
+	t.right = execute.NewColListBlockBuilder(t.key, t.alloc)
 }
 
 // Join performs a sort-merge join
@@ -473,13 +473,7 @@ func (t *joinTables) Join() (execute.Block, error) {
 		return nil, errors.Wrap(err, "failed to prepare join function")
 	}
 	// Create a builder for the result of the join
-	builder := execute.NewColListBlockBuilder(t.alloc)
-	// TODO(nathanielc): Does join change the partition key?
-	// Or does it simply leverage it to do an effiecient join?
-	// If you join on `_time` does that mean you want to partition on `_time`?
-	// If you join on `host` does that mean you want to partition on `host`?
-	// I think that join should not change the partition key.
-	//builder.SetKey(t.key)
+	builder := execute.NewColListBlockBuilder(t.key, t.alloc)
 
 	// Add columns from function in sorted order
 	properties := t.joinFn.Type().Properties()
@@ -492,6 +486,7 @@ func (t *joinTables) Join() (execute.Block, error) {
 		builder.AddCol(execute.ColMeta{
 			Label: k,
 			Type:  execute.ConvertFromKind(properties[k].Kind()),
+			Key:   execute.ColIdx(k, t.key.Cols()) >= 0,
 		})
 	}
 
@@ -653,18 +648,13 @@ func (f *joinFunc) Prepare(tables map[string]*execute.ColListBlock) error {
 		cols := b.Cols()
 		tblPropertyTypes := make(map[string]semantic.Type, len(f.references[tbl]))
 		for _, r := range f.references[tbl] {
-			found := false
-			for j, c := range cols {
-				if r == c.Label {
-					f.recordCols[tableCol{table: tbl, col: c.Label}] = j
-					tblPropertyTypes[r] = execute.ConvertToKind(c.Type)
-					found = true
-					break
-				}
-			}
-			if !found {
+			j := execute.ColIdx(r, cols)
+			if j < 0 {
 				return fmt.Errorf("function references unknown column %q of table %q", r, tbl)
 			}
+			c := cols[j]
+			f.recordCols[tableCol{table: tbl, col: c.Label}] = j
+			tblPropertyTypes[r] = execute.ConvertToKind(c.Type)
 		}
 		propertyTypes[tbl] = semantic.NewObjectType(tblPropertyTypes)
 	}
