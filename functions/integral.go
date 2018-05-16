@@ -123,6 +123,7 @@ func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) 
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
 
+	execute.AddBlockKeyCols(b.Key(), builder)
 	builder.AddCol(execute.ColMeta{
 		Label: t.spec.TimeCol,
 		Type:  execute.TTime,
@@ -144,19 +145,19 @@ func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) 
 		return err
 	}
 
-	timeIdx := execute.ColIdx(t.spec.TimeValue, cols)
+	timeIdx := execute.ColIdx(t.spec.TimeCol, cols)
 	if timeIdx < 0 {
 		return fmt.Errorf("no column %q exists", t.spec.TimeValue)
 	}
 	err := b.Do(func(cr execute.ColReader) error {
-		for j := range cols {
-			in := integrals[j]
-			if in != nil {
-				l := cr.Len()
-				for i := 0; i < l; i++ {
-					tm := cr.Times(timeIdx)[i]
-					in.updateFloat(tm, cr.Floats(j)[i])
-				}
+		for j, in := range integrals {
+			if in == nil {
+				continue
+			}
+			l := cr.Len()
+			for i := 0; i < l; i++ {
+				tm := cr.Times(timeIdx)[i]
+				in.updateFloat(tm, cr.Floats(j)[i])
 			}
 		}
 		return nil
@@ -165,6 +166,7 @@ func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) 
 		return err
 	}
 
+	execute.AppendKeyValues(b.Key(), builder)
 	for j, in := range integrals {
 		if in == nil {
 			continue
