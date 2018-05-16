@@ -287,14 +287,20 @@ func (d *derivative) updateInt(t execute.Time, v int64) float64 {
 	}
 
 	diff := float64(v - d.pIntValue)
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		diff = float64(v)
+	}
 	elapsed := float64(time.Duration(t-d.pTime)) / d.unit
 
 	d.pTime = t
 	d.pIntValue = v
 
 	if d.nonNegative && diff < 0 {
-		//TODO(nathanielc): Return null when we have null support
-		return math.NaN()
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		return float64(v)
 	}
 
 	return diff / elapsed
@@ -314,15 +320,15 @@ func (d *derivative) updateUInt(t execute.Time, v uint64) float64 {
 	} else {
 		diff = float64(v - d.pUIntValue)
 	}
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		diff = float64(v)
+	}
 	elapsed := float64(time.Duration(t-d.pTime)) / d.unit
 
 	d.pTime = t
 	d.pUIntValue = v
-
-	if d.nonNegative && diff < 0 {
-		//TODO(nathanielc): Return null when we have null support
-		return math.NaN()
-	}
 
 	return diff / elapsed
 }
@@ -335,15 +341,15 @@ func (d *derivative) updateFloat(t execute.Time, v float64) float64 {
 	}
 
 	diff := v - d.pFloatValue
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		diff = v
+	}
 	elapsed := float64(time.Duration(t-d.pTime)) / d.unit
 
 	d.pTime = t
 	d.pFloatValue = v
-
-	if d.nonNegative && diff < 0 {
-		//TODO(nathanielc): Return null when we have null support
-		return math.NaN()
-	}
 
 	return diff / elapsed
 }

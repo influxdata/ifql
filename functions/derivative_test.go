@@ -1,7 +1,6 @@
 package functions_test
 
 import (
-	"math"
 	"testing"
 	"time"
 
@@ -45,7 +44,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "float",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: 1,
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    1,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -70,7 +71,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "float with units",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: query.Duration(time.Second),
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    query.Duration(time.Second),
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -95,7 +98,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "int",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: 1,
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    1,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -120,7 +125,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "int with units",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: query.Duration(time.Second),
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    query.Duration(time.Second),
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -145,6 +152,8 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "int non negative",
 			spec: &functions.DerivativeProcedureSpec{
+				Columns:     []string{execute.DefaultValueColLabel},
+				TimeCol:     execute.DefaultTimeColLabel,
 				Unit:        1,
 				NonNegative: true,
 			},
@@ -165,6 +174,7 @@ func TestDerivative_Process(t *testing.T) {
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
+					{execute.Time(2), 10.0},
 					{execute.Time(3), 10.0},
 				},
 			}},
@@ -172,7 +182,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "uint",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: 1,
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    1,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -197,7 +209,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "uint with negative result",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: 1,
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    1,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -222,6 +236,8 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "uint with non negative",
 			spec: &functions.DerivativeProcedureSpec{
+				Columns:     []string{execute.DefaultValueColLabel},
+				TimeCol:     execute.DefaultTimeColLabel,
 				Unit:        1,
 				NonNegative: true,
 			},
@@ -242,6 +258,7 @@ func TestDerivative_Process(t *testing.T) {
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
+					{execute.Time(2), 10.0},
 					{execute.Time(3), 10.0},
 				},
 			}},
@@ -249,7 +266,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "uint with units",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: query.Duration(time.Second),
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    query.Duration(time.Second),
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -274,6 +293,8 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "non negative one block",
 			spec: &functions.DerivativeProcedureSpec{
+				Columns:     []string{execute.DefaultValueColLabel},
+				TimeCol:     execute.DefaultTimeColLabel,
 				Unit:        1,
 				NonNegative: true,
 			},
@@ -294,37 +315,17 @@ func TestDerivative_Process(t *testing.T) {
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(3), 1.0},
-				},
-			}},
-		},
-		{
-			name: "non negative one block with empty result",
-			spec: &functions.DerivativeProcedureSpec{
-				Unit:        1,
-				NonNegative: true,
-			},
-			data: []execute.Block{&executetest.Block{
-				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime},
-					{Label: "_value", Type: execute.TFloat},
-				},
-				Data: [][]interface{}{
-					{execute.Time(1), 2.0},
 					{execute.Time(2), 1.0},
-				},
-			}},
-			want: []*executetest.Block{{
-				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime},
-					{Label: "_value", Type: execute.TFloat},
+					{execute.Time(3), 1.0},
 				},
 			}},
 		},
 		{
 			name: "float with tags",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: 1,
+				Columns: []string{execute.DefaultValueColLabel},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    1,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -351,7 +352,9 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "float with multiple values",
 			spec: &functions.DerivativeProcedureSpec{
-				Unit: 1,
+				Columns: []string{"x", "y"},
+				TimeCol: execute.DefaultTimeColLabel,
+				Unit:    1,
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -378,6 +381,8 @@ func TestDerivative_Process(t *testing.T) {
 		{
 			name: "float non negative with multiple values",
 			spec: &functions.DerivativeProcedureSpec{
+				Columns:     []string{"x", "y"},
+				TimeCol:     execute.DefaultTimeColLabel,
 				Unit:        1,
 				NonNegative: true,
 			},
@@ -400,7 +405,8 @@ func TestDerivative_Process(t *testing.T) {
 					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(3), 1.0, math.NaN()},
+					{execute.Time(2), 1.0, 10.0},
+					{execute.Time(3), 1.0, 0.0},
 				},
 			}},
 		},
