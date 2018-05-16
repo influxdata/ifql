@@ -150,10 +150,11 @@ func (t *rangeTransformation) RetractBlock(id execute.DatasetID, key execute.Par
 }
 
 func (t *rangeTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b.Key())
-	if new {
-		execute.AddBlockCols(b, builder)
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("range found duplicate block with key: %v", b.Key())
 	}
+	execute.AddBlockCols(b, builder)
 	cols := make([]int, len(b.Cols()))
 	for i := range cols {
 		cols[i] = i

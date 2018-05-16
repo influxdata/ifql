@@ -111,9 +111,9 @@ func (t *cumulativeSumTransformation) RetractBlock(id execute.DatasetID, key exe
 }
 
 func (t *cumulativeSumTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b.Key())
-	if !new {
-		return fmt.Errorf("found duplicate block with key: %v", b.Key())
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("cumulative sum found duplicate block with key: %v", b.Key())
 	}
 	execute.AddBlockCols(b, builder)
 

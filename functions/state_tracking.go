@@ -210,6 +210,12 @@ func (t *stateTrackingTransformation) RetractBlock(id execute.DatasetID, key exe
 }
 
 func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Block) error {
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("found duplicate block with key: %v", b.Key())
+	}
+	execute.AddBlockCols(b, builder)
+
 	// Prepare the functions for the column types.
 	cols := b.Cols()
 	err := t.fn.Prepare(cols)
@@ -217,13 +223,6 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 		// TODO(nathanielc): Should we not fail the query for failed compilation?
 		return err
 	}
-
-	builder, new := t.cache.BlockBuilder(b.Key())
-	if !new {
-		return fmt.Errorf("found duplicate block with key: %v", b.Key())
-	}
-
-	execute.AddBlockCols(b, builder)
 
 	var countCol, durationCol = -1, -1
 

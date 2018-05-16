@@ -149,8 +149,8 @@ func (t *shiftTransformation) Process(id execute.DatasetID, b execute.Block) err
 	}
 	key = execute.NewPartitionKey(cols, values)
 
-	builder, new := t.cache.BlockBuilder(key)
-	if !new {
+	builder, created := t.cache.BlockBuilder(key)
+	if !created {
 		return fmt.Errorf("shift found duplicate block with key: %v", b.Key())
 	}
 	execute.AddBlockCols(b, builder)

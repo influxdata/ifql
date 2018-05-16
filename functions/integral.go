@@ -118,9 +118,9 @@ func (t *integralTransformation) RetractBlock(id execute.DatasetID, key execute.
 }
 
 func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b.Key())
-	if !new {
-		return fmt.Errorf("found duplicate block with key: %v", b.Key())
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("integral found duplicate block with key: %v", b.Key())
 	}
 
 	execute.AddBlockKeyCols(b.Key(), builder)

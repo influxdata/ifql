@@ -134,8 +134,8 @@ func (t *mapTransformation) Process(id execute.DatasetID, b execute.Block) error
 				continue
 			}
 			key := execute.PartitionKeyForRow(i, cr)
-			builder, new := t.cache.BlockBuilder(key)
-			if new {
+			builder, created := t.cache.BlockBuilder(key)
+			if created {
 				// Add columns from function in sorted order
 				properties := t.fn.Type().Properties()
 				keys := make([]string, 0, len(properties))

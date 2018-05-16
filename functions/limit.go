@@ -137,9 +137,9 @@ func (t *limitTransformation) RetractBlock(id execute.DatasetID, key execute.Par
 }
 
 func (t *limitTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b.Key())
-	if !new {
-		return fmt.Errorf("filter found duplicate block with key: %v", b.Key())
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("limit found duplicate block with key: %v", b.Key())
 	}
 	execute.AddBlockCols(b, builder)
 

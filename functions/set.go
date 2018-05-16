@@ -135,8 +135,8 @@ func (t *setTransformation) Process(id execute.DatasetID, b execute.Block) error
 		}
 		key = execute.NewPartitionKey(cols, values)
 	}
-	builder, new := t.cache.BlockBuilder(key)
-	if new {
+	builder, created := t.cache.BlockBuilder(key)
+	if created {
 		execute.AddBlockCols(b, builder)
 		if !execute.HasCol(t.key, builder.Cols()) {
 			builder.AddCol(execute.ColMeta{

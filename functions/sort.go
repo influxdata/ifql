@@ -129,8 +129,8 @@ func (t *sortTransformation) RetractBlock(id execute.DatasetID, key execute.Part
 }
 
 func (t *sortTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b.Key())
-	if !new {
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
 		return fmt.Errorf("sort found duplicate block with key: %v", b.Key())
 	}
 	execute.AddBlockCols(b, builder)

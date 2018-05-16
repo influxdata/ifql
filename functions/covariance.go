@@ -157,9 +157,9 @@ func (t *CovarianceTransformation) RetractBlock(id execute.DatasetID, key execut
 
 func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	cols := b.Cols()
-	builder, new := t.cache.BlockBuilder(b.Key())
-	if !new {
-		return fmt.Errorf("found duplicate block with key: %v", b.Key())
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("covariance found duplicate block with key: %v", b.Key())
 	}
 	execute.AddBlockKeyCols(b.Key(), builder)
 	builder.AddCol(execute.ColMeta{

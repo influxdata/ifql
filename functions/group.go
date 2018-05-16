@@ -252,8 +252,8 @@ func (t *groupTransformation) Process(id execute.DatasetID, b execute.Block) err
 		l := cr.Len()
 		for i := 0; i < l; i++ {
 			key := execute.PartitionKeyForRowOn(i, cr, on)
-			builder, new := t.cache.BlockBuilder(key)
-			if new {
+			builder, created := t.cache.BlockBuilder(key)
+			if created {
 				execute.AddBlockCols(b, builder)
 			}
 			execute.AppendRecord(i, cr, builder)

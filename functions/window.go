@@ -307,8 +307,8 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 					}
 				}
 				key := execute.NewPartitionKey(cols, values)
-				builder, new := t.cache.BlockBuilder(key)
-				if new {
+				builder, created := t.cache.BlockBuilder(key)
+				if created {
 					for _, c := range newCols {
 						builder.AddCol(c)
 					}
