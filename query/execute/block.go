@@ -260,6 +260,32 @@ func PartitionKeyForRow(i int, cr ColReader) PartitionKey {
 	}
 }
 
+func PartitionKeyForRowOn(i int, cr ColReader, on map[string]bool) PartitionKey {
+	cols := make([]ColMeta, 0, len(on))
+	values := make([]interface{}, 0, len(on))
+	for j, c := range cr.Cols() {
+		if !on[c.Label] {
+			continue
+		}
+		cols = append(cols, c)
+		switch c.Type {
+		case TBool:
+			values = append(values, cr.Bools(j)[i])
+		case TInt:
+			values = append(values, cr.Ints(j)[i])
+		case TUInt:
+			values = append(values, cr.UInts(j)[i])
+		case TFloat:
+			values = append(values, cr.Floats(j)[i])
+		case TString:
+			values = append(values, cr.Strings(j)[i])
+		case TTime:
+			values = append(values, cr.Times(j)[i])
+		}
+	}
+	return NewPartitionKey(cols, values)
+}
+
 type Block interface {
 	Key() PartitionKey
 

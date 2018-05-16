@@ -2,6 +2,7 @@ package functions
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"sort"
 	"sync"
@@ -259,6 +260,9 @@ func (t *mergeJoinTransformation) Process(id execute.DatasetID, b execute.Block)
 	colMap := make([]int, len(labels))
 	for _, label := range labels {
 		blockIdx := execute.ColIdx(label, b.Cols())
+		if blockIdx < 0 {
+			return fmt.Errorf("no column %q exists", label)
+		}
 		// Only add the column if it does not already exist
 		builderIdx := execute.ColIdx(label, table.Cols())
 		if builderIdx < 0 {
@@ -347,6 +351,7 @@ type mergeJoinCache struct {
 	alloc *execute.Allocator
 
 	keys []string
+	on   map[string]bool
 
 	leftName, rightName string
 
@@ -356,9 +361,14 @@ type mergeJoinCache struct {
 }
 
 func NewMergeJoinCache(joinFn *joinFunc, a *execute.Allocator, leftName, rightName string, keys []string) *mergeJoinCache {
+	on := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		on[k] = true
+	}
 	return &mergeJoinCache{
 		data:      execute.NewPartitionLookup(),
 		keys:      keys,
+		on:        on,
 		joinFn:    joinFn,
 		alloc:     a,
 		leftName:  leftName,
@@ -423,6 +433,7 @@ func (c *mergeJoinCache) Tables(key execute.PartitionKey) *joinTables {
 		tables = &joinTables{
 			keys:      c.keys,
 			key:       key,
+			on:        c.on,
 			alloc:     c.alloc,
 			left:      execute.NewColListBlockBuilder(key, c.alloc),
 			right:     execute.NewColListBlockBuilder(key, c.alloc),
@@ -438,6 +449,7 @@ func (c *mergeJoinCache) Tables(key execute.PartitionKey) *joinTables {
 
 type joinTables struct {
 	keys []string
+	on   map[string]bool
 	key  execute.PartitionKey
 
 	alloc *execute.Allocator
@@ -512,7 +524,9 @@ func (t *joinTables) Join() (execute.Block, error) {
 
 	leftSet, leftKey = t.advance(leftSet.Stop, left)
 	rightSet, rightKey = t.advance(rightSet.Stop, right)
+	log.Println(leftKey, rightKey)
 	for !leftSet.Empty() && !rightSet.Empty() {
+		log.Println(leftKey, rightKey)
 		if leftKey.Equal(rightKey) {
 			// Inner join
 			for l := leftSet.Start; l < leftSet.Stop; l++ {
@@ -546,10 +560,10 @@ func (t *joinTables) advance(offset int, table *execute.ColListBlock) (subset, e
 		return subset{Start: n, Stop: n}, nil
 	}
 	start := offset
-	key := execute.PartitionKeyForRow(start, table)
+	key := execute.PartitionKeyForRowOn(start, table, t.on)
 	s := subset{Start: start}
 	offset++
-	for offset < table.NRows() && equalRowKeys(start, offset, table) {
+	for offset < table.NRows() && equalRowKeys(start, offset, table, t.on) {
 		offset++
 	}
 	s.Stop = offset
@@ -565,10 +579,9 @@ func (s subset) Empty() bool {
 	return s.Start == s.Stop
 }
 
-func equalRowKeys(x, y int, table *execute.ColListBlock) bool {
-	key := table.Key()
+func equalRowKeys(x, y int, table *execute.ColListBlock, on map[string]bool) bool {
 	for j, c := range table.Cols() {
-		if !key.HasCol(c.Label) {
+		if !on[c.Label] {
 			continue
 		}
 		switch c.Type {

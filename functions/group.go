@@ -251,7 +251,7 @@ func (t *groupTransformation) Process(id execute.DatasetID, b execute.Block) err
 	return b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()
 		for i := 0; i < l; i++ {
-			key := partitionKeyForRowOn(i, cr, on)
+			key := execute.PartitionKeyForRowOn(i, cr, on)
 			builder, new := t.cache.BlockBuilder(key)
 			if new {
 				execute.AddBlockCols(b, builder)
@@ -260,32 +260,6 @@ func (t *groupTransformation) Process(id execute.DatasetID, b execute.Block) err
 		}
 		return nil
 	})
-}
-
-func partitionKeyForRowOn(i int, cr execute.ColReader, on map[string]bool) execute.PartitionKey {
-	cols := make([]execute.ColMeta, 0, len(on))
-	values := make([]interface{}, 0, len(on))
-	for j, c := range cr.Cols() {
-		if !on[c.Label] {
-			continue
-		}
-		cols = append(cols, c)
-		switch c.Type {
-		case execute.TBool:
-			values = append(values, cr.Bools(j)[i])
-		case execute.TInt:
-			values = append(values, cr.Ints(j)[i])
-		case execute.TUInt:
-			values = append(values, cr.UInts(j)[i])
-		case execute.TFloat:
-			values = append(values, cr.Floats(j)[i])
-		case execute.TString:
-			values = append(values, cr.Strings(j)[i])
-		case execute.TTime:
-			values = append(values, cr.Times(j)[i])
-		}
-	}
-	return execute.NewPartitionKey(cols, values)
 }
 
 func (t *groupTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {
