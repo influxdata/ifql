@@ -263,7 +263,7 @@ func (d *difference) updateInt(v int64) int64 {
 	if d.nonNegative && diff < 0 {
 		//TODO(nathanielc): Return null when we have null support
 		// Also see https://github.com/influxdata/ifql/issues/217
-		return 0
+		return v
 	}
 
 	return diff
@@ -288,7 +288,7 @@ func (d *difference) updateUInt(v uint64) int64 {
 	if d.nonNegative && diff < 0 {
 		//TODO(nathanielc): Return null when we have null support
 		// Also see https://github.com/influxdata/ifql/issues/217
-		return 0
+		return int64(v)
 	}
 
 	return diff
@@ -306,7 +306,7 @@ func (d *difference) updateFloat(v float64) float64 {
 	if d.nonNegative && diff < 0 {
 		//TODO(nathanielc): Return null when we have null support
 		// Also see https://github.com/influxdata/ifql/issues/217
-		return math.NaN()
+		return v
 	}
 
 	return diff

@@ -1,7 +1,6 @@
 package functions_test
 
 import (
-	"math"
 	"testing"
 
 	"github.com/influxdata/ifql/functions"
@@ -42,7 +41,9 @@ func TestDifference_Process(t *testing.T) {
 	}{
 		{
 			name: "float",
-			spec: &functions.DifferenceProcedureSpec{},
+			spec: &functions.DifferenceProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -65,7 +66,9 @@ func TestDifference_Process(t *testing.T) {
 		},
 		{
 			name: "int",
-			spec: &functions.DifferenceProcedureSpec{},
+			spec: &functions.DifferenceProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -89,6 +92,7 @@ func TestDifference_Process(t *testing.T) {
 		{
 			name: "int non negative",
 			spec: &functions.DifferenceProcedureSpec{
+				Columns:     []string{execute.DefaultValueColLabel},
 				NonNegative: true,
 			},
 			data: []execute.Block{&executetest.Block{
@@ -108,13 +112,16 @@ func TestDifference_Process(t *testing.T) {
 					{Label: "_value", Type: execute.TInt},
 				},
 				Data: [][]interface{}{
+					{execute.Time(2), int64(10)},
 					{execute.Time(3), int64(10)},
 				},
 			}},
 		},
 		{
 			name: "uint",
-			spec: &functions.DifferenceProcedureSpec{},
+			spec: &functions.DifferenceProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -137,7 +144,9 @@ func TestDifference_Process(t *testing.T) {
 		},
 		{
 			name: "uint with negative result",
-			spec: &functions.DifferenceProcedureSpec{},
+			spec: &functions.DifferenceProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -161,6 +170,7 @@ func TestDifference_Process(t *testing.T) {
 		{
 			name: "uint with non negative",
 			spec: &functions.DifferenceProcedureSpec{
+				Columns:     []string{execute.DefaultValueColLabel},
 				NonNegative: true,
 			},
 			data: []execute.Block{&executetest.Block{
@@ -180,6 +190,7 @@ func TestDifference_Process(t *testing.T) {
 					{Label: "_value", Type: execute.TInt},
 				},
 				Data: [][]interface{}{
+					{execute.Time(2), int64(10)},
 					{execute.Time(3), int64(10)},
 				},
 			}},
@@ -187,6 +198,7 @@ func TestDifference_Process(t *testing.T) {
 		{
 			name: "non negative one block",
 			spec: &functions.DifferenceProcedureSpec{
+				Columns:     []string{execute.DefaultValueColLabel},
 				NonNegative: true,
 			},
 			data: []execute.Block{&executetest.Block{
@@ -206,35 +218,16 @@ func TestDifference_Process(t *testing.T) {
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
+					{execute.Time(2), 1.0},
 					{execute.Time(3), 1.0},
 				},
 			}},
 		},
 		{
-			name: "non negative one block with empty result",
-			spec: &functions.DifferenceProcedureSpec{
-				NonNegative: true,
-			},
-			data: []execute.Block{&executetest.Block{
-				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime},
-					{Label: "_value", Type: execute.TFloat},
-				},
-				Data: [][]interface{}{
-					{execute.Time(1), 2.0},
-					{execute.Time(2), 1.0},
-				},
-			}},
-			want: []*executetest.Block{{
-				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime},
-					{Label: "_value", Type: execute.TFloat},
-				},
-			}},
-		},
-		{
 			name: "float with tags",
-			spec: &functions.DifferenceProcedureSpec{},
+			spec: &functions.DifferenceProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -259,7 +252,9 @@ func TestDifference_Process(t *testing.T) {
 		},
 		{
 			name: "float with multiple values",
-			spec: &functions.DifferenceProcedureSpec{},
+			spec: &functions.DifferenceProcedureSpec{
+				Columns: []string{"x", "y"},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -285,6 +280,7 @@ func TestDifference_Process(t *testing.T) {
 		{
 			name: "float non negative with multiple values",
 			spec: &functions.DifferenceProcedureSpec{
+				Columns:     []string{"x", "y"},
 				NonNegative: true,
 			},
 			data: []execute.Block{&executetest.Block{
@@ -306,7 +302,8 @@ func TestDifference_Process(t *testing.T) {
 					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(3), 1.0, math.NaN()},
+					{execute.Time(2), 1.0, 10.0},
+					{execute.Time(3), 1.0, 0.0},
 				},
 			}},
 		},
