@@ -2,7 +2,6 @@ package functions
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
@@ -149,7 +148,6 @@ func (t *shiftTransformation) Process(id execute.DatasetID, b execute.Block) err
 		}
 	}
 	key = execute.NewPartitionKey(cols, values)
-	log.Println(key)
 
 	builder, new := t.cache.BlockBuilder(key)
 	if !new {

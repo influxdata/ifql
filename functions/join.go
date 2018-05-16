@@ -2,7 +2,6 @@ package functions
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"sort"
 	"sync"
@@ -524,9 +523,7 @@ func (t *joinTables) Join() (execute.Block, error) {
 
 	leftSet, leftKey = t.advance(leftSet.Stop, left)
 	rightSet, rightKey = t.advance(rightSet.Stop, right)
-	log.Println(leftKey, rightKey)
 	for !leftSet.Empty() && !rightSet.Empty() {
-		log.Println(leftKey, rightKey)
 		if leftKey.Equal(rightKey) {
 			// Inner join
 			for l := leftSet.Start; l < leftSet.Stop; l++ {

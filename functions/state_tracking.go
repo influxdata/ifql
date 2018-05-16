@@ -278,7 +278,6 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 				}
 				count++
 			}
-			log.Println(cr.Cols(), builder.Cols())
 			execute.AppendRecordForCols(i, cr, builder, cr.Cols())
 			if countCol > 0 {
 				builder.AppendInt(countCol, count)
