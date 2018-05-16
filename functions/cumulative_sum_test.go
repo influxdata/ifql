@@ -82,7 +82,7 @@ func TestCumulativeSum_Process(t *testing.T) {
 		{
 			name: "multiple value columns",
 			spec: &functions.CumulativeSumProcedureSpec{
-				Columns: []string{execute.DefaultValueColLabel},
+				Columns: []string{"int", "uint", "float"},
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -128,7 +128,7 @@ func TestCumulativeSum_Process(t *testing.T) {
 		{
 			name: "multiple time columns",
 			spec: &functions.CumulativeSumProcedureSpec{
-				Columns: []string{execute.DefaultValueColLabel},
+				Columns: []string{"int", "float"},
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -174,7 +174,7 @@ func TestCumulativeSum_Process(t *testing.T) {
 		{
 			name: "tag columns",
 			spec: &functions.CumulativeSumProcedureSpec{
-				Columns: []string{execute.DefaultValueColLabel},
+				Columns: []string{"int"},
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
