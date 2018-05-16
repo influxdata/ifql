@@ -223,9 +223,10 @@ func (t *filterTransformation) RetractBlock(id execute.DatasetID, key execute.Pa
 
 func (t *filterTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	builder, new := t.cache.BlockBuilder(b.Key())
-	if new {
-		execute.AddBlockCols(b, builder)
+	if !new {
+		return fmt.Errorf("filter found duplicate block with key: %v", b.Key())
 	}
+	execute.AddBlockCols(b, builder)
 
 	// Prepare the function for the column types.
 	cols := b.Cols()
