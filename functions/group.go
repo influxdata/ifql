@@ -3,7 +3,6 @@ package functions
 import (
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 
 	"github.com/influxdata/ifql/interpreter"
@@ -17,7 +16,6 @@ const GroupKind = "group"
 
 type GroupOpSpec struct {
 	By     []string `json:"by"`
-	Keep   []string `json:"keep"`
 	Except []string `json:"except"`
 }
 
@@ -25,7 +23,6 @@ var groupSignature = query.DefaultFunctionSignature()
 
 func init() {
 	groupSignature.Params["by"] = semantic.NewArrayType(semantic.String)
-	groupSignature.Params["keep"] = semantic.NewArrayType(semantic.String)
 	groupSignature.Params["except"] = semantic.NewArrayType(semantic.String)
 
 	query.RegisterFunction(GroupKind, createGroupOpSpec, groupSignature)
@@ -45,14 +42,6 @@ func createGroupOpSpec(args query.Arguments, a *query.Administration) (query.Ope
 		return nil, err
 	} else if ok {
 		spec.By, err = interpreter.ToStringArray(array)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if array, ok, err := args.GetArray("keep", semantic.String); err != nil {
-		return nil, err
-	} else if ok {
-		spec.Keep, err = interpreter.ToStringArray(array)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +72,6 @@ func (s *GroupOpSpec) Kind() query.OperationKind {
 type GroupProcedureSpec struct {
 	By     []string
 	Except []string
-	Keep   []string
 }
 
 func newGroupProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -95,7 +83,6 @@ func newGroupProcedure(qs query.OperationSpec, pa plan.Administration) (plan.Pro
 	p := &GroupProcedureSpec{
 		By:     spec.By,
 		Except: spec.Except,
-		Keep:   spec.Keep,
 	}
 	return p, nil
 }
@@ -111,9 +98,6 @@ func (s *GroupProcedureSpec) Copy() plan.ProcedureSpec {
 
 	ns.Except = make([]string, len(s.Except))
 	copy(ns.Except, s.Except)
-
-	ns.Keep = make([]string, len(s.Keep))
-	copy(ns.Keep, s.Keep)
 
 	return ns
 }
@@ -139,7 +123,6 @@ func (s *GroupProcedureSpec) PushDown(root *plan.Procedure, dup func() *plan.Pro
 		selectSpec.MergeAll = false
 		selectSpec.GroupKeys = nil
 		selectSpec.GroupExcept = nil
-		selectSpec.GroupKeep = nil
 		return
 	}
 	selectSpec.GroupingSet = true
@@ -150,7 +133,6 @@ func (s *GroupProcedureSpec) PushDown(root *plan.Procedure, dup func() *plan.Pro
 	selectSpec.MergeAll = len(s.By) == 0 && len(s.Except) == 0
 	selectSpec.GroupKeys = s.By
 	selectSpec.GroupExcept = s.Except
-	selectSpec.GroupKeep = s.Keep
 }
 
 type AggregateGroupRewriteRule struct {
@@ -216,7 +198,6 @@ type groupTransformation struct {
 
 	keys   []string
 	except []string
-	keep   []string
 
 	// Ignoring is true of len(keys) == 0 && len(except) > 0
 	ignoring bool
@@ -228,12 +209,10 @@ func NewGroupTransformation(d execute.Dataset, cache execute.BlockBuilderCache, 
 		cache:    cache,
 		keys:     spec.By,
 		except:   spec.Except,
-		keep:     spec.Keep,
 		ignoring: len(spec.By) == 0 && len(spec.Except) > 0,
 	}
 	sort.Strings(t.keys)
 	sort.Strings(t.except)
-	sort.Strings(t.keep)
 	return t
 }
 
@@ -272,16 +251,41 @@ func (t *groupTransformation) Process(id execute.DatasetID, b execute.Block) err
 	return b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()
 		for i := 0; i < l; i++ {
-			key := execute.PartitionKeyForRow(i, cr)
+			key := partitionKeyForRowOn(i, cr, on)
 			builder, new := t.cache.BlockBuilder(key)
 			if new {
 				execute.AddBlockCols(b, builder)
 			}
-			log.Println(cr.Cols(), builder.Cols())
 			execute.AppendRecord(i, cr, builder)
 		}
 		return nil
 	})
+}
+
+func partitionKeyForRowOn(i int, cr execute.ColReader, on map[string]bool) execute.PartitionKey {
+	cols := make([]execute.ColMeta, 0, len(on))
+	values := make([]interface{}, 0, len(on))
+	for j, c := range cr.Cols() {
+		if !on[c.Label] {
+			continue
+		}
+		cols = append(cols, c)
+		switch c.Type {
+		case execute.TBool:
+			values = append(values, cr.Bools(j)[i])
+		case execute.TInt:
+			values = append(values, cr.Ints(j)[i])
+		case execute.TUInt:
+			values = append(values, cr.UInts(j)[i])
+		case execute.TFloat:
+			values = append(values, cr.Floats(j)[i])
+		case execute.TString:
+			values = append(values, cr.Strings(j)[i])
+		case execute.TTime:
+			values = append(values, cr.Times(j)[i])
+		}
+	}
+	return execute.NewPartitionKey(cols, values)
 }
 
 func (t *groupTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {
