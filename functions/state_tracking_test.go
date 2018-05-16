@@ -51,6 +51,7 @@ func TestStateTracking_Process(t *testing.T) {
 				DurationLabel: "duration",
 				DurationUnit:  1,
 				Fn:            gt5,
+				TimeCol:       "_time",
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -89,6 +90,7 @@ func TestStateTracking_Process(t *testing.T) {
 				DurationLabel: "duration",
 				DurationUnit:  1,
 				Fn:            gt5,
+				TimeCol:       "_time",
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
@@ -125,6 +127,7 @@ func TestStateTracking_Process(t *testing.T) {
 			spec: &functions.StateTrackingProcedureSpec{
 				CountLabel: "count",
 				Fn:         gt5,
+				TimeCol:    "_time",
 			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{

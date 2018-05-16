@@ -392,7 +392,7 @@ func AppendCol(bj, cj int, cr ColReader, builder BlockBuilder) {
 	}
 }
 
-// AppendMappedRecord appends the records from cr onto builder assuming matching columns.
+// AppendMappedRecord appends the record from cr onto builder assuming matching columns.
 func AppendRecord(i int, cr ColReader, builder BlockBuilder) {
 	for j, c := range builder.Cols() {
 		switch c.Type {
@@ -430,6 +430,28 @@ func AppendMappedRecord(i int, cr ColReader, builder BlockBuilder, colMap []int)
 			builder.AppendString(j, cr.Strings(colMap[j])[i])
 		case TTime:
 			builder.AppendTime(j, cr.Times(colMap[j])[i])
+		default:
+			PanicUnknownType(c.Type)
+		}
+	}
+}
+
+// AppendRecordForCols appends the only the columns provided from cr onto builder.
+func AppendRecordForCols(i int, cr ColReader, builder BlockBuilder, cols []ColMeta) {
+	for j, c := range cols {
+		switch c.Type {
+		case TBool:
+			builder.AppendBool(j, cr.Bools(j)[i])
+		case TInt:
+			builder.AppendInt(j, cr.Ints(j)[i])
+		case TUInt:
+			builder.AppendUInt(j, cr.UInts(j)[i])
+		case TFloat:
+			builder.AppendFloat(j, cr.Floats(j)[i])
+		case TString:
+			builder.AppendString(j, cr.Strings(j)[i])
+		case TTime:
+			builder.AppendTime(j, cr.Times(j)[i])
 		default:
 			PanicUnknownType(c.Type)
 		}

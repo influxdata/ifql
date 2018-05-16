@@ -249,6 +249,9 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 	)
 
 	timeIdx := execute.ColIdx(t.timeCol, b.Cols())
+	if timeIdx < 0 {
+		return fmt.Errorf("no column %q exists", t.timeCol)
+	}
 	// Append modified rows
 	return b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()
@@ -275,7 +278,8 @@ func (t *stateTrackingTransformation) Process(id execute.DatasetID, b execute.Bl
 				}
 				count++
 			}
-			execute.AppendRecord(i, cr, builder)
+			log.Println(cr.Cols(), builder.Cols())
+			execute.AppendRecordForCols(i, cr, builder, cr.Cols())
 			if countCol > 0 {
 				builder.AppendInt(countCol, count)
 			}
