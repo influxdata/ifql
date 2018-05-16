@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
 	"github.com/influxdata/ifql/functions/storage"
@@ -181,18 +180,33 @@ func convertDataType(t ReadResponse_DataType) execute.DataType {
 	}
 }
 
+const (
+	startColIdx = 0
+	stopColIdx  = 1
+	timeColIdx  = 2
+	valueColIdx = 3
+)
+
 func (bi *bockIterator) determineBlockCols(s *ReadResponse_SeriesFrame, typ execute.DataType) []execute.ColMeta {
-	cols := make([]execute.ColMeta, 2+len(s.Tags))
-	cols[0] = execute.ColMeta{
+	cols := make([]execute.ColMeta, 4+len(s.Tags))
+	cols[startColIdx] = execute.ColMeta{
+		Label: execute.DefaultStartColLabel,
+		Type:  execute.TTime,
+	}
+	cols[stopColIdx] = execute.ColMeta{
+		Label: execute.DefaultStopColLabel,
+		Type:  execute.TTime,
+	}
+	cols[timeColIdx] = execute.ColMeta{
 		Label: execute.DefaultTimeColLabel,
 		Type:  execute.TTime,
 	}
-	cols[1] = execute.ColMeta{
+	cols[valueColIdx] = execute.ColMeta{
 		Label: execute.DefaultValueColLabel,
 		Type:  typ,
 	}
 	for j, tag := range s.Tags {
-		cols[2+j] = execute.ColMeta{
+		cols[4+j] = execute.ColMeta{
 			Label: string(tag.Key),
 			Type:  execute.TString,
 		}
@@ -234,9 +248,7 @@ func partitionKeyForSeries(s *ReadResponse_SeriesFrame, readSpec *storage.ReadSp
 type block struct {
 	bounds execute.Bounds
 	key    execute.PartitionKey
-	// cols always has at least two columns, where the first is a TimeCol
-	// and the second is any Value column.
-	cols []execute.ColMeta
+	cols   []execute.ColMeta
 
 	// cache of the tags on the current series.
 	// len(tags) == len(colMeta)
@@ -377,7 +389,7 @@ func (b *block) advance() bool {
 			// Advance to next frame
 			b.ms.next()
 		case boolPointsType:
-			if b.cols[1].Type != execute.TBool {
+			if b.cols[valueColIdx].Type != execute.TBool {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -402,12 +414,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.boolBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.boolBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.boolBuf
 			b.appendTags()
+			b.appendBounds()
 			return true
 		case intPointsType:
-			if b.cols[1].Type != execute.TInt {
+			if b.cols[valueColIdx].Type != execute.TInt {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -432,12 +445,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.intBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.intBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.intBuf
 			b.appendTags()
+			b.appendBounds()
 			return true
 		case uintPointsType:
-			if b.cols[1].Type != execute.TUInt {
+			if b.cols[valueColIdx].Type != execute.TUInt {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -462,12 +476,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.uintBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.uintBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.uintBuf
 			b.appendTags()
+			b.appendBounds()
 			return true
 		case floatPointsType:
-			if b.cols[1].Type != execute.TFloat {
+			if b.cols[valueColIdx].Type != execute.TFloat {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -493,12 +508,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.floatBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.floatBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.floatBuf
 			b.appendTags()
+			b.appendBounds()
 			return true
 		case stringPointsType:
-			if b.cols[1].Type != execute.TString {
+			if b.cols[valueColIdx].Type != execute.TString {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -524,9 +540,10 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.stringBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.stringBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.stringBuf
 			b.appendTags()
+			b.appendBounds()
 			return true
 		}
 	}
@@ -537,7 +554,6 @@ func (b *block) advance() bool {
 func (b *block) appendTags() {
 	for j := range b.cols {
 		v := b.tags[j]
-		log.Println(j, string(v))
 		if v != nil {
 			if b.colBufs[j] == nil {
 				b.colBufs[j] = make([]string, b.l)
@@ -554,6 +570,26 @@ func (b *block) appendTags() {
 			}
 			b.colBufs[j] = colBuf
 		}
+	}
+}
+
+// appendBounds fills the colBufs for the time bounds
+func (b *block) appendBounds() {
+	bounds := []execute.Time{b.bounds.Start, b.bounds.Stop}
+	for j := range []int{startColIdx, stopColIdx} {
+		if b.colBufs[j] == nil {
+			b.colBufs[j] = make([]execute.Time, b.l)
+		}
+		colBuf := b.colBufs[j].([]execute.Time)
+		if cap(colBuf) < b.l {
+			colBuf = make([]execute.Time, b.l)
+		} else {
+			colBuf = colBuf[:b.l]
+		}
+		for i := range colBuf {
+			colBuf[i] = bounds[j]
+		}
+		b.colBufs[j] = colBuf
 	}
 }
 

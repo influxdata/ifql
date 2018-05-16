@@ -705,9 +705,20 @@ Operations that modify the partition keys or values will need to repartition the
 
 From produces a stream of tables from the specified bucket.
 Each unique series is contained within its own table.
-The tables schema will include a `_time` column, columns for each tag on the series and a `_value` column for the value of the series.
 Each record in the table represents a single point in the series.
 
+The tables schema will include the following columns:
+
+* `_time`
+    the time of the record
+* `_value`
+    the value of the record
+* `_start`
+    the inclusive lower time bound of all records
+* `_stop`
+    the exclusive upper time bound of all records
+
+Additionally any tags on the series will be added as columns.
 
 Example:
 
