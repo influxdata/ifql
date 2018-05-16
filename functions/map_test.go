@@ -153,16 +153,32 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.BinaryExpression{
-						Operator: ast.AdditionOperator,
-						Left: &semantic.MemberExpression{
-							Object: &semantic.IdentifierExpression{
-								Name: "r",
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
+								Value: &semantic.MemberExpression{
+									Object: &semantic.IdentifierExpression{
+										Name: "r",
+									},
+									Property: "_time",
+								},
 							},
-							Property: "_value",
-						},
-						Right: &semantic.FloatLiteral{
-							Value: 5,
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.BinaryExpression{
+									Operator: ast.AdditionOperator,
+									Left: &semantic.MemberExpression{
+										Object: &semantic.IdentifierExpression{
+											Name: "r",
+										},
+										Property: "_value",
+									},
+									Right: &semantic.FloatLiteral{
+										Value: 5,
+									},
+								},
+							},
 						},
 					},
 				},
