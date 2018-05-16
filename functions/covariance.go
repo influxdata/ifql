@@ -161,11 +161,11 @@ func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block
 	if !new {
 		return fmt.Errorf("found duplicate block with key: %v", b.Key())
 	}
+	execute.AddBlockKeyCols(b.Key(), builder)
 	builder.AddCol(execute.ColMeta{
 		Label: t.spec.TimeCol,
 		Type:  execute.TTime,
 	})
-	execute.AddBlockKeyCols(b.Key(), builder)
 	valueIdx := builder.AddCol(execute.ColMeta{
 		Label: t.spec.ValueLabel,
 		Type:  execute.TFloat,
@@ -191,6 +191,7 @@ func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block
 		return nil
 	})
 
+	execute.AppendKeyValues(b.Key(), builder)
 	builder.AppendFloat(valueIdx, t.value())
 	return nil
 }

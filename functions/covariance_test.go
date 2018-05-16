@@ -183,6 +183,7 @@ func TestCovariance_Process(t *testing.T) {
 		{
 			name: "variance",
 			spec: &functions.CovarianceProcedureSpec{
+				ValueLabel: execute.DefaultValueColLabel,
 				AggregateConfig: execute.AggregateConfig{
 					TimeValue: execute.DefaultStopColLabel,
 					TimeCol:   execute.DefaultTimeColLabel,
@@ -220,6 +221,7 @@ func TestCovariance_Process(t *testing.T) {
 		{
 			name: "negative covariance",
 			spec: &functions.CovarianceProcedureSpec{
+				ValueLabel: execute.DefaultValueColLabel,
 				AggregateConfig: execute.AggregateConfig{
 					TimeValue: execute.DefaultStopColLabel,
 					TimeCol:   execute.DefaultTimeColLabel,
@@ -257,6 +259,7 @@ func TestCovariance_Process(t *testing.T) {
 		{
 			name: "small covariance",
 			spec: &functions.CovarianceProcedureSpec{
+				ValueLabel: execute.DefaultValueColLabel,
 				AggregateConfig: execute.AggregateConfig{
 					TimeValue: execute.DefaultStopColLabel,
 					TimeCol:   execute.DefaultTimeColLabel,
@@ -294,6 +297,7 @@ func TestCovariance_Process(t *testing.T) {
 		{
 			name: "pearson correlation",
 			spec: &functions.CovarianceProcedureSpec{
+				ValueLabel:         execute.DefaultValueColLabel,
 				PearsonCorrelation: true,
 				AggregateConfig: execute.AggregateConfig{
 					TimeValue: execute.DefaultStopColLabel,
@@ -332,6 +336,7 @@ func TestCovariance_Process(t *testing.T) {
 		{
 			name: "pearson correlation opposite",
 			spec: &functions.CovarianceProcedureSpec{
+				ValueLabel:         execute.DefaultValueColLabel,
 				PearsonCorrelation: true,
 				AggregateConfig: execute.AggregateConfig{
 					TimeValue: execute.DefaultStopColLabel,
