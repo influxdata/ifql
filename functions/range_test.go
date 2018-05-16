@@ -6,6 +6,7 @@ import (
 
 	"github.com/influxdata/ifql/functions"
 	"github.com/influxdata/ifql/query"
+	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
 	"github.com/influxdata/ifql/query/plan/plantest"
 	"github.com/influxdata/ifql/query/querytest"
@@ -38,8 +39,10 @@ func TestRange_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID:   "sum2",
-						Spec: &functions.SumOpSpec{},
+						ID: "sum2",
+						Spec: &functions.SumOpSpec{
+							AggregateConfig: execute.DefaultAggregateConfig,
+						},
 					},
 				},
 				Edges: []query.Edge{
