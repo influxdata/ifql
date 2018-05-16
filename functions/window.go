@@ -178,7 +178,8 @@ func createWindowTransformation(id execute.DatasetID, mode execute.AccumulationM
 	t := NewFixedWindowTransformation(
 		d,
 		cache,
-		a.Bounds(), execute.Window{
+		a.Bounds(),
+		execute.Window{
 			Every:  execute.Duration(s.Window.Every),
 			Period: execute.Duration(s.Window.Period),
 			Round:  execute.Duration(s.Window.Round),
@@ -249,7 +250,7 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 	startColIdx := -1
 	stopColIdx := -1
 	for j, c := range b.Cols() {
-		keyed := false
+		keyed := b.Key().HasCol(c.Label)
 		if c.Label == t.startColLabel {
 			startColIdx = j
 			keyed = true
@@ -300,7 +301,7 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 					case t.startColLabel:
 						values[j] = bnds.Start
 					case t.stopColLabel:
-						values[j] = bnds.Start
+						values[j] = bnds.Stop
 					default:
 						values[j] = b.Key().Value(keyColMap[j])
 					}

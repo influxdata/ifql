@@ -177,17 +177,14 @@ func partitionKeyEqual(a, b PartitionKey) bool {
 }
 
 func partitionKeyLess(a, b PartitionKey) bool {
-	if a.Hash() == b.Hash() {
-		return false
-	}
 	aCols := a.Cols()
 	bCols := b.Cols()
-	if len(aCols) != len(bCols) {
-		return false
+	if av, bv := len(aCols), len(bCols); av != bv {
+		return av < bv
 	}
 	for j, c := range aCols {
 		if aCols[j] != bCols[j] {
-			return false
+			return aCols[j].Label < bCols[j].Label
 		}
 		switch c.Type {
 		case TBool:
@@ -1150,30 +1147,6 @@ func (c *timeColumn) Less(i, j int) bool {
 func (c *timeColumn) Swap(i, j int) {
 	c.data[i], c.data[j] = c.data[j], c.data[i]
 }
-
-//commonStrColumn has the same string value for all rows
-type commonStrColumn struct {
-	ColMeta
-	value string
-}
-
-func (c *commonStrColumn) Meta() ColMeta {
-	return c.ColMeta
-}
-func (c *commonStrColumn) Clear() {
-}
-func (c *commonStrColumn) Copy() column {
-	cpy := new(commonStrColumn)
-	*cpy = *c
-	return cpy
-}
-func (c *commonStrColumn) Equal(i, j int) bool {
-	return true
-}
-func (c *commonStrColumn) Less(i, j int) bool {
-	return false
-}
-func (c *commonStrColumn) Swap(i, j int) {}
 
 type BlockBuilderCache interface {
 	// BlockBuilder returns an existing or new BlockBuilder for the given meta data.
