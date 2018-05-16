@@ -88,7 +88,7 @@ func TestSet_Process(t *testing.T) {
 			}},
 		},
 		{
-			name: "replace common col",
+			name: "replace key col",
 			spec: &functions.SetProcedureSpec{
 				Key:   "t1",
 				Value: "bob",

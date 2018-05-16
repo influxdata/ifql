@@ -121,31 +121,42 @@ func (t *setTransformation) RetractBlock(id execute.DatasetID, key execute.Parti
 
 func (t *setTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	key := b.Key()
-	if execute.ColIdx(t.key, key.Cols()) >= 0 {
+	if idx := execute.ColIdx(t.key, key.Cols()); idx >= 0 {
 		// Update key
 		cols := make([]execute.ColMeta, len(key.Cols()))
 		values := make([]interface{}, len(key.Cols()))
 		for j, c := range key.Cols() {
 			cols[j] = c
-			values[j] = key.Value(j)
+			if j == idx {
+				values[j] = t.value
+			} else {
+				values[j] = key.Value(j)
+			}
 		}
 		key = execute.NewPartitionKey(cols, values)
 	}
 	builder, new := t.cache.BlockBuilder(key)
 	if new {
 		execute.AddBlockCols(b, builder)
+		if !execute.HasCol(t.key, builder.Cols()) {
+			builder.AddCol(execute.ColMeta{
+				Label: t.key,
+				Type:  execute.TString,
+			})
+		}
 	}
-	idx := execute.ColIdx(t.key, b.Cols())
+	idx := execute.ColIdx(t.key, builder.Cols())
 	return b.Do(func(cr execute.ColReader) error {
 		for j := range cr.Cols() {
 			if j == idx {
-				l := cr.Len()
-				for i := 0; i < l; i++ {
-					builder.AppendString(j, t.value)
-				}
-			} else {
-				execute.AppendCol(idx, idx, cr, builder)
+				continue
 			}
+			execute.AppendCol(j, j, cr, builder)
+		}
+		// Set new value
+		l := cr.Len()
+		for i := 0; i < l; i++ {
+			builder.AppendString(idx, t.value)
 		}
 		return nil
 	})

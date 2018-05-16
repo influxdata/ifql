@@ -467,19 +467,6 @@ func ContainsStr(strs []string, str string) bool {
 	return false
 }
 
-var NoDefaultValueColumn = fmt.Errorf("no default value column %q found.", DefaultValueColLabel)
-
-func ValueCol(cols []ColMeta) (ColMeta, error) {
-	for _, c := range cols {
-		if c.Label == DefaultValueColLabel {
-			return c, nil
-		}
-	}
-	return ColMeta{}, NoDefaultValueColumn
-}
-func ValueIdx(cols []ColMeta) int {
-	return ColIdx(DefaultValueColLabel, cols)
-}
 func ColIdx(label string, cols []ColMeta) int {
 	for j, c := range cols {
 		if c.Label == label {
@@ -487,6 +474,9 @@ func ColIdx(label string, cols []ColMeta) int {
 		}
 	}
 	return -1
+}
+func HasCol(label string, cols []ColMeta) bool {
+	return ColIdx(label, cols) >= 0
 }
 
 // BlockBuilder builds blocks that can be used multiple times

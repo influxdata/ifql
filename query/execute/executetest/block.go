@@ -106,11 +106,14 @@ func ConvertBlock(b execute.Block) *Block {
 		ColMeta: b.Cols(),
 	}
 
-	keys := make([]string, len(b.Key().Cols()))
-	for j, c := range b.Key().Cols() {
-		keys[j] = c.Label
+	keyCols := b.Key().Cols()
+	if len(keyCols) > 0 {
+		keys := make([]string, len(keyCols))
+		for j, c := range keyCols {
+			keys[j] = c.Label
+		}
+		blk.KeyCols = keys
 	}
-	blk.KeyCols = keys
 
 	b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()
