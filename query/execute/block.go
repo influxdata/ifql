@@ -20,6 +20,8 @@ const (
 type PartitionKey interface {
 	Cols() []ColMeta
 
+	HasCol(label string) bool
+
 	ValueBool(j int) bool
 	ValueUInt(j int) uint64
 	ValueInt(j int) int64
@@ -55,6 +57,9 @@ func NewPartitionKey(cols []ColMeta, values []interface{}) PartitionKey {
 
 func (k *partitionKey) Cols() []ColMeta {
 	return k.cols
+}
+func (k *partitionKey) HasCol(label string) bool {
+	return ColIdx(label, k.cols) >= 0
 }
 func (k *partitionKey) Value(j int) interface{} {
 	return k.values[j]
@@ -228,11 +233,12 @@ func (k *partitionKey) String() string {
 }
 
 func PartitionKeyForRow(i int, cr ColReader) PartitionKey {
+	key := cr.Key()
 	cols := cr.Cols()
 	colsCpy := make([]ColMeta, 0, len(cols))
 	values := make([]interface{}, 0, len(cols))
 	for j, c := range cols {
-		if !c.Key {
+		if !key.HasCol(c.Label) {
 			continue
 		}
 		colsCpy = append(colsCpy, c)
@@ -565,7 +571,6 @@ func (t DataType) String() string {
 type ColMeta struct {
 	Label string
 	Type  DataType
-	Key   bool // Key indicates that the column is part of the partition key
 }
 
 type BlockIterator interface {
@@ -576,6 +581,7 @@ type BlockIterator interface {
 // All data the ColReader exposes is guaranteed to be in memory.
 // Once a ColReader goes out of scope all slices are considered invalid.
 type ColReader interface {
+	Key() PartitionKey
 	// Cols returns a list of column metadata.
 	Cols() []ColMeta
 	// Len returns the length of the slices.

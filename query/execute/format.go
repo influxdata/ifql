@@ -273,14 +273,6 @@ func (o orderedCols) Less(i int, j int) bool {
 		return false
 	}
 
-	// Keyed cols before other cols
-	if o.cols[i].Key && !o.cols[j].Key {
-		return true
-	}
-	if !o.cols[i].Key && o.cols[j].Key {
-		return false
-	}
-
 	// Value column is always last
 	if o.cols[i].Label == DefaultValueColLabel {
 		return false

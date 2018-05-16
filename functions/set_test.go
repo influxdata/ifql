@@ -94,10 +94,11 @@ func TestSet_Process(t *testing.T) {
 				Value: "bob",
 			},
 			data: []execute.Block{&executetest.Block{
+				KeyCols: []string{"t1"},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
-					{Label: "t1", Type: execute.TString, Key: true},
+					{Label: "t1", Type: execute.TString},
 					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
@@ -106,10 +107,11 @@ func TestSet_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
+				KeyCols: []string{"t1"},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
-					{Label: "t1", Type: execute.TString, Key: true},
+					{Label: "t1", Type: execute.TString},
 					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
@@ -126,10 +128,11 @@ func TestSet_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "t1", Type: execute.TString, Key: true},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "alice"},
@@ -137,10 +140,11 @@ func TestSet_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "t1", Type: execute.TString, Key: true},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(3), 3.0, "sue"},
@@ -149,10 +153,11 @@ func TestSet_Process(t *testing.T) {
 				},
 			},
 			want: []*executetest.Block{{
+				KeyCols: []string{"t1"},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
-					{Label: "t1", Type: execute.TString, Key: true},
+					{Label: "t1", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0, "bob"},
@@ -170,10 +175,11 @@ func TestSet_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "t1", Type: execute.TString, Key: true},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "alice"},
@@ -181,10 +187,11 @@ func TestSet_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "t1", Type: execute.TString, Key: true},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(3), 3.0, "sue"},
@@ -194,10 +201,11 @@ func TestSet_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "t1", Type: execute.TString, Key: true},
+						{Label: "t1", Type: execute.TString},
 						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{
@@ -206,10 +214,11 @@ func TestSet_Process(t *testing.T) {
 					},
 				},
 				{
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "t1", Type: execute.TString, Key: true},
+						{Label: "t1", Type: execute.TString},
 						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{

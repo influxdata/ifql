@@ -249,16 +249,17 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 	startColIdx := -1
 	stopColIdx := -1
 	for j, c := range b.Cols() {
+		keyed := false
 		if c.Label == t.startColLabel {
 			startColIdx = j
-			c.Key = true
+			keyed = true
 		}
 		if c.Label == t.stopColLabel {
 			stopColIdx = j
-			c.Key = true
+			keyed = true
 		}
 		newCols = append(newCols, c)
-		if c.Key {
+		if keyed {
 			keyCols = append(keyCols, c)
 			keyColMap = append(keyColMap, j)
 		}
@@ -268,7 +269,6 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 		c := execute.ColMeta{
 			Label: t.startColLabel,
 			Type:  execute.TTime,
-			Key:   true,
 		}
 		newCols = append(newCols, c)
 		keyCols = append(keyCols, c)
@@ -279,7 +279,6 @@ func (t *fixedWindowTransformation) Process(id execute.DatasetID, b execute.Bloc
 		c := execute.ColMeta{
 			Label: t.stopColLabel,
 			Type:  execute.TTime,
-			Key:   true,
 		}
 		newCols = append(newCols, c)
 		keyCols = append(keyCols, c)

@@ -43,9 +43,9 @@ func init() {
 	t1Value := "a"
 	key := execute.NewPartitionKey(
 		[]execute.ColMeta{
-			{Label: execute.DefaultStartColLabel, Type: execute.TTime, Key: true},
-			{Label: execute.DefaultStopColLabel, Type: execute.TTime, Key: true},
-			{Label: "t1", Type: execute.TString, Key: true},
+			{Label: execute.DefaultStartColLabel, Type: execute.TTime},
+			{Label: execute.DefaultStopColLabel, Type: execute.TTime},
+			{Label: "t1", Type: execute.TString},
 		},
 		[]interface{}{
 			start,
@@ -59,8 +59,8 @@ func init() {
 	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultStartColLabel, Type: execute.TTime})
 	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultStopColLabel, Type: execute.TTime})
 	normalBlockBuilder.AddCol(execute.ColMeta{Label: execute.DefaultValueColLabel, Type: execute.TFloat})
-	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t1", Type: execute.TString, Key: true})
-	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t2", Type: execute.TString, Key: false})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t1", Type: execute.TString})
+	normalBlockBuilder.AddCol(execute.ColMeta{Label: "t2", Type: execute.TString})
 
 	times := make([]execute.Time, N)
 	startTimes := make([]execute.Time, N)

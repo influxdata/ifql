@@ -218,11 +218,12 @@ func TestSort_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "host", Type: execute.TString, Key: true},
-						{Label: "_field", Type: execute.TString, Key: false},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostA", "F1"},
@@ -234,11 +235,12 @@ func TestSort_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "host", Type: execute.TString, Key: true},
-						{Label: "_field", Type: execute.TString, Key: false},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostB", "F1"},
@@ -252,11 +254,12 @@ func TestSort_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "host", Type: execute.TString, Key: true},
-						{Label: "_field", Type: execute.TString, Key: false},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostA", "F1"},
@@ -268,11 +271,12 @@ func TestSort_Process(t *testing.T) {
 					},
 				},
 				{
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
-						{Label: "host", Type: execute.TString, Key: true},
-						{Label: "_field", Type: execute.TString, Key: false},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostB", "F1"},

@@ -3,6 +3,7 @@ package functions
 import (
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 
 	"github.com/influxdata/ifql/interpreter"
@@ -274,8 +275,9 @@ func (t *groupTransformation) Process(id execute.DatasetID, b execute.Block) err
 			key := execute.PartitionKeyForRow(i, cr)
 			builder, new := t.cache.BlockBuilder(key)
 			if new {
-				execute.AddBlockKeyCols(b.Key(), builder)
+				execute.AddBlockCols(b, builder)
 			}
+			log.Println(cr.Cols(), builder.Cols())
 			execute.AppendRecord(i, cr, builder)
 		}
 		return nil

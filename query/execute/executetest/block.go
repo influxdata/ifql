@@ -8,6 +8,7 @@ import (
 
 type Block struct {
 	PartitionKey execute.PartitionKey
+	KeyCols      []string
 	ColMeta      []execute.ColMeta
 	// Data is a list of rows, i.e. Data[row][col]
 	// Each row must be a list with length equal to len(ColMeta)
@@ -22,13 +23,12 @@ func (b *Block) Cols() []execute.ColMeta {
 
 func (b *Block) Key() execute.PartitionKey {
 	if b.PartitionKey == nil {
-		cols := make([]execute.ColMeta, 0, len(b.ColMeta))
-		values := make([]interface{}, 0, len(b.ColMeta))
-		for j, c := range b.ColMeta {
-			if c.Key {
-				cols = append(cols, c)
-				values = append(values, b.Data[0][j])
-			}
+		cols := make([]execute.ColMeta, len(b.KeyCols))
+		values := make([]interface{}, len(b.KeyCols))
+		for j, label := range b.KeyCols {
+			idx := execute.ColIdx(label, b.ColMeta)
+			cols[j] = b.ColMeta[idx]
+			values[j] = b.Data[0][idx]
 		}
 		b.PartitionKey = execute.NewPartitionKey(cols, values)
 	}
@@ -38,6 +38,7 @@ func (b *Block) Key() execute.PartitionKey {
 func (b *Block) Do(f func(execute.ColReader) error) error {
 	for _, r := range b.Data {
 		if err := f(ColReader{
+			key:  b.Key(),
 			cols: b.ColMeta,
 			row:  r,
 		}); err != nil {
@@ -48,6 +49,7 @@ func (b *Block) Do(f func(execute.ColReader) error) error {
 }
 
 type ColReader struct {
+	key  execute.PartitionKey
 	cols []execute.ColMeta
 	row  []interface{}
 }
@@ -56,6 +58,9 @@ func (cr ColReader) Cols() []execute.ColMeta {
 	return cr.cols
 }
 
+func (cr ColReader) Key() execute.PartitionKey {
+	return cr.key
+}
 func (cr ColReader) Len() int {
 	return 1
 }
@@ -100,6 +105,12 @@ func ConvertBlock(b execute.Block) *Block {
 	blk := &Block{
 		ColMeta: b.Cols(),
 	}
+
+	keys := make([]string, len(b.Key().Cols()))
+	for j, c := range b.Key().Cols() {
+		keys[j] = c.Label
+	}
+	blk.KeyCols = keys
 
 	b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()

@@ -118,7 +118,7 @@ func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
 			return fmt.Errorf("column %q does not exist", label)
 		}
 		c := cols[idx]
-		if c.Key {
+		if b.Key().HasCol(c.Label) {
 			return errors.New("cannot aggregate columns that are part of the partition key")
 		}
 		var vf ValueFunc

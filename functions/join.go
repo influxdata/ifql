@@ -263,7 +263,6 @@ func (t *mergeJoinTransformation) Process(id execute.DatasetID, b execute.Block)
 		builderIdx := execute.ColIdx(label, table.Cols())
 		if builderIdx < 0 {
 			c := b.Cols()[blockIdx]
-			c.Key = execute.ContainsStr(t.keys, c.Label)
 			builderIdx = table.AddCol(c)
 		}
 		colMap[builderIdx] = blockIdx
@@ -486,7 +485,6 @@ func (t *joinTables) Join() (execute.Block, error) {
 		builder.AddCol(execute.ColMeta{
 			Label: k,
 			Type:  execute.ConvertFromKind(properties[k].Kind()),
-			Key:   execute.ColIdx(k, t.key.Cols()) >= 0,
 		})
 	}
 
@@ -568,36 +566,38 @@ func (s subset) Empty() bool {
 }
 
 func equalRowKeys(x, y int, table *execute.ColListBlock) bool {
+	key := table.Key()
 	for j, c := range table.Cols() {
-		if c.Key {
-			switch c.Type {
-			case execute.TBool:
-				if xv, yv := table.Bools(j)[x], table.Bools(j)[y]; xv != yv {
-					return false
-				}
-			case execute.TInt:
-				if xv, yv := table.Ints(j)[x], table.Ints(j)[y]; xv != yv {
-					return false
-				}
-			case execute.TUInt:
-				if xv, yv := table.UInts(j)[x], table.UInts(j)[y]; xv != yv {
-					return false
-				}
-			case execute.TFloat:
-				if xv, yv := table.Floats(j)[x], table.Floats(j)[y]; xv != yv {
-					return false
-				}
-			case execute.TString:
-				if xv, yv := table.Strings(j)[x], table.Strings(j)[y]; xv != yv {
-					return false
-				}
-			case execute.TTime:
-				if xv, yv := table.Times(j)[x], table.Times(j)[y]; xv != yv {
-					return false
-				}
-			default:
-				execute.PanicUnknownType(c.Type)
+		if !key.HasCol(c.Label) {
+			continue
+		}
+		switch c.Type {
+		case execute.TBool:
+			if xv, yv := table.Bools(j)[x], table.Bools(j)[y]; xv != yv {
+				return false
 			}
+		case execute.TInt:
+			if xv, yv := table.Ints(j)[x], table.Ints(j)[y]; xv != yv {
+				return false
+			}
+		case execute.TUInt:
+			if xv, yv := table.UInts(j)[x], table.UInts(j)[y]; xv != yv {
+				return false
+			}
+		case execute.TFloat:
+			if xv, yv := table.Floats(j)[x], table.Floats(j)[y]; xv != yv {
+				return false
+			}
+		case execute.TString:
+			if xv, yv := table.Strings(j)[x], table.Strings(j)[y]; xv != yv {
+				return false
+			}
+		case execute.TTime:
+			if xv, yv := table.Times(j)[x], table.Times(j)[y]; xv != yv {
+				return false
+			}
+		default:
+			execute.PanicUnknownType(c.Type)
 		}
 	}
 	return true
