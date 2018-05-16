@@ -39,7 +39,9 @@ func TestCumulativeSum_Process(t *testing.T) {
 	}{
 		{
 			name: "float",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -79,7 +81,9 @@ func TestCumulativeSum_Process(t *testing.T) {
 		},
 		{
 			name: "multiple value columns",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -123,7 +127,9 @@ func TestCumulativeSum_Process(t *testing.T) {
 		},
 		{
 			name: "multiple time columns",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
@@ -167,7 +173,9 @@ func TestCumulativeSum_Process(t *testing.T) {
 		},
 		{
 			name: "tag columns",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
