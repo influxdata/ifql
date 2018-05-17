@@ -21,3 +21,7 @@ required = ["github.com/mna/pigeon", "github.com/goreleaser/goreleaser"]
 [[constraint]]
   name = "github.com/prometheus/client_golang"
   revision = "661e31bf844dfca9aeba15f27ea8aa0d485ad212"
+
+[[constraint]]
+  name = "github.com/influxdata/line-protocol"
+  revision = "ddc908b39d054e4fbc8e5b9fb7ee9be0e18fc2c9"
