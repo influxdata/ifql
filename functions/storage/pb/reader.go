@@ -91,9 +91,9 @@ func (bi *bockIterator) Do(f func(execute.Block) error) error {
 	req.TimestampRange.End = int64(bi.bounds.Stop)
 	req.Grouping = bi.readSpec.GroupKeys
 
-	req.SeriesLimit = uint64(bi.readSpec.SeriesLimit)
-	req.PointsLimit = uint64(bi.readSpec.PointsLimit)
-	req.SeriesOffset = uint64(bi.readSpec.SeriesOffset)
+	req.SeriesLimit = bi.readSpec.SeriesLimit
+	req.PointsLimit = bi.readSpec.PointsLimit
+	req.SeriesOffset = bi.readSpec.SeriesOffset
 	req.Trace = bi.trace
 
 	if agg, err := determineAggregateMethod(bi.readSpec.AggregateMethod); err != nil {
