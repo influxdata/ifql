@@ -1,7 +1,6 @@
 package functions_test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -20,7 +19,7 @@ func TestOutputHTTP_NewQuery(t *testing.T) {
 	tests := []querytest.NewQueryTestCase{
 		{
 			Name: "from with database with range",
-			Raw:  `from(db:"mydb") |> outputHTTP(addr: "https://localhost:8081", method:"POST",  timeout: 50s)`, //[{header:"fred" value:"oh no"}, {header:"key2", "value":"oh my!"}, {header:"x-forwarded-for", value:"https://fakeaddr.com"}])`,
+			Raw:  `from(db:"mydb") |> outputHTTP(addr: "https://localhost:8081", name:"series1", method:"POST",  timeout: 50s)`, //[{header:"fred" value:"oh no"}, {header:"key2", "value":"oh my!"}, {header:"x-forwarded-for", value:"https://fakeaddr.com"}])`,
 			Want: &query.Spec{
 				Operations: []*query.Operation{
 					{
@@ -32,10 +31,13 @@ func TestOutputHTTP_NewQuery(t *testing.T) {
 					{
 						ID: "outputHTTP1",
 						Spec: &functions.OutputHTTPOpSpec{
-							Addr:       "https://localhost:8081",
-							Method:     "POST",
-							Timeout:    50 * time.Second,
-							TimeColumn: execute.TimeColLabel,
+							Addr:         "https://localhost:8081",
+							Name:         "series1",
+							Method:       "POST",
+							Timeout:      50 * time.Second,
+							TimeColumn:   execute.TimeColLabel,
+							ValueColumns: []string{execute.DefaultValueColLabel},
+							Headers:      map[string]string{"Content-Type": "application/vnd.influx"},
 						},
 					},
 				},
@@ -128,15 +130,13 @@ func TestOutputHTTP_Process(t *testing.T) {
 	data := []byte{}
 	wg := sync.WaitGroup{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var err error
-		fmt.Println("IN SERVER")
 		defer wg.Done()
-		data, err = ioutil.ReadAll(r.Body)
-		fmt.Println("after readall ", string(data))
+		serverData, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			t.Log(err)
 			t.FailNow()
 		}
+		data = append(data, serverData...)
 	}))
 	type wanted struct {
 		Block  []*executetest.Block
@@ -152,10 +152,12 @@ func TestOutputHTTP_Process(t *testing.T) {
 			name: "one block",
 			spec: &functions.OutputHTTPProcedureSpec{
 				Spec: &functions.OutputHTTPOpSpec{
-					Addr:       server.URL,
-					Method:     "POST",
-					Timeout:    50 * time.Second,
-					TimeColumn: execute.TimeColLabel,
+					Addr:         server.URL,
+					Method:       "POST",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.TimeColLabel,
+					ValueColumns: []string{"_value"},
+					Name:         "one_block",
 				},
 			},
 			data: []execute.Block{&executetest.Block{
@@ -168,22 +170,154 @@ func TestOutputHTTP_Process(t *testing.T) {
 					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(1), 2.0},
-					{execute.Time(2), 1.0},
-					{execute.Time(3), 3.0},
-					{execute.Time(4), 4.0},
+					{execute.Time(11), 2.0},
+					{execute.Time(21), 1.0},
+					{execute.Time(31), 3.0},
+					{execute.Time(41), 4.0},
 				},
 			}},
 			want: wanted{
 				Block:  []*executetest.Block(nil),
-				Result: []byte("food"),
+				Result: []byte("one_block _value=2 11\none_block _value=1 21\none_block _value=3 31\none_block _value=4 41\n"),
+			},
+		},
+		{
+			name: "one block with unused tag",
+			spec: &functions.OutputHTTPProcedureSpec{
+				Spec: &functions.OutputHTTPOpSpec{
+					Addr:         server.URL,
+					Method:       "GET",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.TimeColLabel,
+					ValueColumns: []string{"_value"},
+					Name:         "one_block_w_unused_tag",
+				},
+			},
+			data: []execute.Block{&executetest.Block{
+				Bnds: execute.Bounds{
+					Start: 1,
+					Stop:  5,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "fred", Type: execute.TString},
+				},
+				Data: [][]interface{}{
+					{execute.Time(11), 2.0, "one"},
+					{execute.Time(21), 1.0, "seven"},
+					{execute.Time(31), 3.0, "nine"},
+					{execute.Time(41), 4.0, "elevendyone"},
+				},
+			}},
+			want: wanted{
+				Block: []*executetest.Block(nil),
+				Result: []byte(`one_block_w_unused_tag _value=2 11
+one_block_w_unused_tag _value=1 21
+one_block_w_unused_tag _value=3 31
+one_block_w_unused_tag _value=4 41
+`),
+			},
+		},
+		{
+			name: "one block with tag",
+			spec: &functions.OutputHTTPProcedureSpec{
+				Spec: &functions.OutputHTTPOpSpec{
+					Addr:         server.URL,
+					Method:       "GET",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.TimeColLabel,
+					ValueColumns: []string{"_value"},
+					TagColumns:   []string{"fred"},
+					Name:         "one_block_w_tag",
+				},
+			},
+			data: []execute.Block{&executetest.Block{
+				Bnds: execute.Bounds{
+					Start: 1,
+					Stop:  5,
+				},
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "fred", Type: execute.TString},
+				},
+				Data: [][]interface{}{
+					{execute.Time(11), 2.0, "one"},
+					{execute.Time(21), 1.0, "seven"},
+					{execute.Time(31), 3.0, "nine"},
+					{execute.Time(41), 4.0, "elevendyone"},
+				},
+			}},
+			want: wanted{
+				Block: []*executetest.Block(nil),
+				Result: []byte(`one_block_w_tag,fred=one _value=2 11
+one_block_w_tag,fred=seven _value=1 21
+one_block_w_tag,fred=nine _value=3 31
+one_block_w_tag,fred=elevendyone _value=4 41
+`),
+			},
+		},
+		{
+			name: "multi block",
+			spec: &functions.OutputHTTPProcedureSpec{
+				Spec: &functions.OutputHTTPOpSpec{
+					Addr:         server.URL,
+					Method:       "GET",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.TimeColLabel,
+					ValueColumns: []string{"_value"},
+					TagColumns:   []string{"fred"},
+					Name:         "multi_block",
+				},
+			},
+			data: []execute.Block{
+				&executetest.Block{
+					Bnds: execute.Bounds{
+						Start: 1,
+						Stop:  5,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "fred", Type: execute.TString},
+					},
+					Data: [][]interface{}{
+						{execute.Time(11), 2.0, "one"},
+						{execute.Time(21), 1.0, "seven"},
+						{execute.Time(31), 3.0, "nine"},
+					},
+				},
+				&executetest.Block{
+					Bnds: execute.Bounds{
+						Start: 1,
+						Stop:  5,
+					},
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "fred", Type: execute.TString},
+					},
+					Data: [][]interface{}{
+						{execute.Time(51), 2.0, "one"},
+						{execute.Time(61), 1.0, "seven"},
+						{execute.Time(71), 3.0, "nine"},
+					},
+				},
+			},
+			want: wanted{
+				Block: []*executetest.Block(nil),
+				Result: []byte("multi_block,fred=one _value=2 11\nmulti_block,fred=seven _value=1 21\nmulti_block,fred=nine _value=3 31\n" +
+					"multi_block,fred=one _value=2 51\nmulti_block,fred=seven _value=1 61\nmulti_block,fred=nine _value=3 71\n"),
 			},
 		},
 	}
+
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			wg.Add(1)
+			wg.Add(len(tc.data))
+
 			executetest.ProcessTestHelper(
 				t,
 				tc.data,
@@ -194,51 +328,10 @@ func TestOutputHTTP_Process(t *testing.T) {
 			)
 			wg.Wait() // wait till we are done getting the data back
 			if string(data) != string(tc.want.Result) {
-				t.Logf("expected %s, got %s", string(tc.want.Result), string(data))
+				t.Logf("expected %s, got %s", tc.want.Result, data)
 				t.Fail()
 			}
+			data = data[:0]
 		})
 	}
 }
-
-// func TestOutputHTTP_PushDown(t *testing.T) {
-// 	spec := &functions.RangeProcedureSpec{
-// 		Bounds: plan.BoundsSpec{
-// 			Stop: query.Now,
-// 		},
-// 	}
-// 	root := &plan.Procedure{
-// 		Spec: new(functions.FromProcedureSpec),
-// 	}
-// 	want := &plan.Procedure{
-// 		Spec: &functions.FromProcedureSpec{
-// 			BoundsSet: true,
-// 			Bounds: plan.BoundsSpec{
-// 				Stop: query.Now,
-// 			},
-// 		},
-// 	}
-
-// 	plantest.PhysicalPlan_PushDown_TestHelper(t, spec, root, false, want)
-// }
-
-// func TestOutputHTTP_PushDown_Duplicate(t *testing.T) {
-// 	spec := &functions.RangeProcedureSpec{
-// 		Bounds: plan.BoundsSpec{
-// 			Stop: query.Now,
-// 		},
-// 	}
-// 	root := &plan.Procedure{
-// 		Spec: &functions.FromProcedureSpec{
-// 			BoundsSet: true,
-// 			Bounds: plan.BoundsSpec{
-// 				Start: query.MinTime,
-// 				Stop:  query.Now,
-// 			},
-// 		},
-// 	}
-// 	want := &plan.Procedure{
-// 		// Expect the duplicate has been reset to zero values
-// 		Spec: new(functions.FromProcedureSpec),
-// 	}
-// }

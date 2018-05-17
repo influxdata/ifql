@@ -10,12 +10,13 @@ import (
 	"net/url"
 	"runtime"
 	"sort"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
+	"github.com/influxdata/ifql/semantic"
 	"github.com/influxdata/line-protocol"
 	"github.com/pkg/errors"
 )
@@ -52,23 +53,42 @@ var outputHTTPKeepAliveClient = newOutPutClient()
 type innerOutputHTTPOpSpec OutputHTTPOpSpec
 
 type OutputHTTPOpSpec struct {
-	Addr        string            `json:"addr"`
-	Method      string            `json:"method"`    // default behavior should be POST
-	Headers     map[string]string `json:"headers"`   // TODO: implement Headers after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
-	URLParams   map[string]string `json:"urlparams"` // TODO: implement URLParams after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
-	Timeout     time.Duration     `json:"timeout"`   // default to something reasonable if zero
-	NoKeepAlive bool              `json:"nokeepalive"`
-	TimeColumn  string            `json:"time_column"`
-	// TagColumns   []string          `json:"tag_columns"`
-	// ValueColumns []string          `json:"value_columns"`
+	Addr         string            `json:"addr"`
+	Method       string            `json:"method"` // default behavior should be POST
+	Name         string            `json:"name"`
+	Headers      map[string]string `json:"headers"`   // TODO: implement Headers after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
+	URLParams    map[string]string `json:"urlparams"` // TODO: implement URLParams after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
+	Timeout      time.Duration     `json:"timeout"`   // default to something reasonable if zero
+	NoKeepAlive  bool              `json:"nokeepalive"`
+	TimeColumn   string            `json:"time_column"`
+	TagColumns   []string          `json:"tag_columns"`
+	ValueColumns []string          `json:"value_columns"`
 }
 
+func init() {
+	query.RegisterFunction(OutputHTTPKind, createOutputHTTPOpSpec, outputHTTPSignature)
+	query.RegisterOpSpec(OutputHTTPKind,
+		func() query.OperationSpec { return &OutputHTTPOpSpec{} })
+	plan.RegisterProcedureSpec(OutputHTTPKind, newOutputHTTPProcedure, OutputHTTPKind)
+	execute.RegisterTransformation(OutputHTTPKind, createOutputHTTPTransformation)
+}
+
+// ReadArgs loads a query.Arguments into OutputHTTPOpSpec.  It sets several default values.
+// If the http method isn't set, it defaults to POST, it also uppercases the http method.
+// If the time_column isn't set, it defaults to execute.TimeColLabel.
+// If the value_column isn't set it defaults to a []string{execute.DefaultValueColLabel}.
 func (o *OutputHTTPOpSpec) ReadArgs(args query.Arguments) error {
 	var err error
 	o.Addr, err = args.GetRequiredString("addr")
 	if err != nil {
 		return err
 	}
+
+	o.Name, err = args.GetRequiredString("name")
+	if err != nil {
+		return err
+	}
+
 	var ok bool
 	o.Method, ok, err = args.GetString("method")
 	if err != nil {
@@ -77,6 +97,7 @@ func (o *OutputHTTPOpSpec) ReadArgs(args query.Arguments) error {
 	if !ok {
 		o.Method = "POST"
 	}
+	o.Method = strings.ToUpper(o.Method)
 
 	timeout, ok, err := args.GetDuration("timeout")
 	if err != nil {
@@ -96,21 +117,35 @@ func (o *OutputHTTPOpSpec) ReadArgs(args query.Arguments) error {
 		o.TimeColumn = execute.TimeColLabel
 	}
 
-	// tagColumns, ok, err = args.GetArray("tag_columns", semantic.String)
-	// if err != nil {
-	// 	return err
-	// }
-	// if !ok {
-	// 	o.TagColumns = nil
-	// }
+	tagColumns, ok, err := args.GetArray("tag_columns", semantic.String)
+	if err != nil {
+		return err
+	}
+	o.TagColumns = o.TagColumns[:0]
+	if ok {
+		for i := 0; i < tagColumns.Len(); i++ {
+			o.TagColumns = append(o.TagColumns, tagColumns.Get(i).Str())
+		}
+		sort.Strings(o.TagColumns)
+	}
 
-	// o.TimeColumn, ok, err = args.GetString("value_columns")
-	// if err != nil {
-	// 	return err
-	// }
-	// if !ok {
-	// 	o.TimeColumn = execute.TimeColLabel
-	// }
+	valueColumns, ok, err := args.GetArray("value_columns", semantic.String)
+	if err != nil {
+		return err
+	}
+	o.ValueColumns = o.ValueColumns[:0]
+
+	if !ok || valueColumns.Len() == 0 {
+		o.ValueColumns = append(o.ValueColumns, execute.DefaultValueColLabel)
+	} else {
+		for i := 0; i < valueColumns.Len(); i++ {
+			o.TagColumns = append(o.ValueColumns, valueColumns.Get(i).Str())
+		}
+		sort.Strings(o.TagColumns)
+	}
+
+	// TODO: get other headers working!
+	o.Headers = map[string]string{"Content-Type": "application/vnd.influx"}
 
 	return err
 
@@ -143,19 +178,10 @@ func (o *OutputHTTPOpSpec) UnmarshalJSON(b []byte) (err error) {
 	if !(u.Scheme == "https" || u.Scheme == "http" || u.Scheme == "") {
 		return fmt.Errorf("Scheme must be http or https but was %s", u.Scheme)
 	}
-	fmt.Println(u)
 	return nil
 }
 
 var outputHTTPSignature = query.DefaultFunctionSignature()
-
-func init() {
-	query.RegisterFunction(OutputHTTPKind, createOutputHTTPOpSpec, outputHTTPSignature)
-	query.RegisterOpSpec(OutputHTTPKind,
-		func() query.OperationSpec { return &OutputHTTPOpSpec{} })
-	plan.RegisterProcedureSpec(OutputHTTPKind, newOutputHTTPProcedure, OutputHTTPKind)
-	//execute.RegisterTransformation(OutputHTTPKind, createCountTransformation)
-}
 
 func (OutputHTTPOpSpec) Kind() query.OperationKind {
 	return OutputHTTPKind
@@ -181,11 +207,21 @@ func newOutputHTTPProcedure(qs query.OperationSpec, a plan.Administration) (plan
 	return &OutputHTTPProcedureSpec{Spec: spec}, nil
 }
 
+func createOutputHTTPTransformation(id execute.DatasetID, mode execute.AccumulationMode, spec plan.ProcedureSpec, a execute.Administration) (execute.Transformation, execute.Dataset, error) {
+	s, ok := spec.(*OutputHTTPProcedureSpec)
+	if !ok {
+		return nil, nil, fmt.Errorf("invalid spec type %T", spec)
+	}
+	cache := execute.NewBlockBuilderCache(a.Allocator())
+	d := execute.NewDataset(id, mode, cache)
+	t := NewOutputHTTPTransformation(d, cache, s)
+	return t, d, nil
+}
+
 type OutputHTTPTransformation struct {
 	d     execute.Dataset
 	cache execute.BlockBuilderCache
-	//bounds execute.Bounds
-	spec *OutputHTTPProcedureSpec
+	spec  *OutputHTTPProcedureSpec
 }
 
 func (t *OutputHTTPTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
@@ -209,22 +245,25 @@ type httpOutputMetric struct {
 	t      time.Time
 }
 
-func (m *httpOutputMetric) Tags() []*protocol.Tag {
+func (m *httpOutputMetric) TagList() []*protocol.Tag {
 	return m.tags
 }
-func (m *httpOutputMetric) Fields() []*protocol.Tag {
-	return m.tags
+func (m *httpOutputMetric) FieldList() []*protocol.Field {
+	return m.fields
+}
+
+func (m *httpOutputMetric) truncateTagsAndFields() {
+	m.fields = m.fields[:0]
+	m.tags = m.tags[:0]
+
 }
 
 func (m *httpOutputMetric) Name() string {
 	return m.name
 }
 
-func (m *httpOutputMetric) AddTag(k, v string) {
-	panic("JUST IMPLEMENTED TO SATISFY API")
-}
-func (m *httpOutputMetric) AddField(k string, v interface{}) {
-	panic("JUST IMPLEMENTED TO SATISFY API")
+func (m *httpOutputMetric) Time() time.Time {
+	return m.t
 }
 
 func (m *httpOutputMetric) setTags(tags map[string]string) {
@@ -243,20 +282,19 @@ func (m *httpOutputMetric) setTags(tags map[string]string) {
 
 type idxType struct {
 	Idx  int
-	Type string
+	Type execute.DataType
 }
 
 func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	pr, pw := io.Pipe()
-	m := httpOutputMetric{}
+	pr, pw := io.Pipe() // TODO: replce the pipe with something faster
+	m := &httpOutputMetric{}
 	e := protocol.NewEncoder(pw)
 	e.FailOnFieldErr(true)
 	e.SetFieldSortOrder(protocol.SortFields)
-	m.setTags(map[string]string(b.Tags()))
 	cols := b.Cols()
 	labels := make(map[string]idxType, len(cols))
 	for i, col := range cols {
-		labels[col.Label] = idxType{Idx: i, Type: col.Type.String()}
+		labels[col.Label] = idxType{Idx: i, Type: col.Type}
 	}
 	// do time
 	timeColLabel := t.spec.Spec.TimeColumn
@@ -264,32 +302,65 @@ func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block
 	if !ok {
 		return errors.New("Could not get time column")
 	}
-	if timeColIdx.Type != execute.TTime.String() {
+	if timeColIdx.Type != execute.TTime {
 		return fmt.Errorf("column %s is not of type %s", timeColLabel, timeColIdx.Type)
 	}
 	iter := b.Col(timeColIdx.Idx)
-	wg := &sync.WaitGroup{}
-
+	var err error
 	go func() {
-		iter.DoTime(func(t []execute.Time, er execute.RowReader) {
-
-			enc
+		m.name = t.spec.Spec.Name
+		iter.DoTime(func(et []execute.Time, er execute.RowReader) {
+			if err != nil {
+				return
+			}
+			m.truncateTagsAndFields()
+			for i, col := range er.Cols() {
+				col := col
+				switch {
+				case col.Label == timeColLabel:
+					m.t = er.AtTime(0, i).Time()
+				case sort.SearchStrings(t.spec.Spec.ValueColumns, col.Label) < len(t.spec.Spec.ValueColumns): // do thing to get values
+					switch col.Type {
+					case execute.TFloat:
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtFloat(0, i)})
+					case execute.TInt:
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtInt(0, i)})
+					case execute.TUInt:
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtUInt(0, i)})
+					case execute.TString:
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtString(0, i)})
+					case execute.TTime:
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtTime(0, i)})
+					case execute.TBool:
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtBool(0, i)})
+					default:
+						err = errors.New("invalid type")
+					}
+				case sort.SearchStrings(t.spec.Spec.TagColumns, col.Label) < len(t.spec.Spec.TagColumns): // do thing to get tag
+					m.tags = append(m.tags, &protocol.Tag{Key: col.Label, Value: er.AtString(0, i)})
+				}
+			}
+			_, err := e.Encode(m)
+			if err != nil {
+				fmt.Println(err)
+			}
 		})
+		pw.Close()
 	}()
+
 	req, err := http.NewRequest(t.spec.Spec.Method, t.spec.Spec.Addr, pr)
 	if err != nil {
 		return err
 	}
-
-	//fmt.Println(buf.Len())
-	//req.Body = ioutil.Close
 
 	if t.spec.Spec.Timeout <= 0 {
 		ctx, cancel := context.WithTimeout(context.Background(), t.spec.Spec.Timeout)
 		req = req.WithContext(ctx)
 		defer cancel()
 	}
-	resp, err := outputHTTPKeepAliveClient.Do(req)
+
+	//resp, err := outputHTTPKeepAliveClient.Do(req)
+	resp, err := http.Post(t.spec.Spec.Addr, "application/json", pr)
 	if err != nil {
 		return err
 	}
