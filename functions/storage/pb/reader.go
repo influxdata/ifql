@@ -401,6 +401,12 @@ func (b *block) advance() bool {
 
 			// Advance to next frame
 			b.ms.next()
+
+			if b.readSpec.PointsLimit == -1 {
+				// do not expect points frames
+				b.l = 0
+				return true
+			}
 		case boolPointsType:
 			if b.cols[valueColIdx].Type != execute.TBool {
 				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TBool)
