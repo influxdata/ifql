@@ -635,6 +635,60 @@ The output of an IFQL program is a query specification, which then may be passed
 A query specification consists of a set of operations and a set of edges between those operations.
 The operations and edges must form a directed acyclic graph (DAG).
 
+#### Encoding
+
+The query specification may be encoded in different formats.
+An encoding must consist of three properties:
+
+* operations -  a list of operations and their specification.
+* edges - a list of edges declaring a parent child relation between operations.
+* resources - an optional set of contraints on the resources the query can consume.
+
+Each operation has three properties:
+
+* kind - kind is the name of the operation to perform.
+* id - an identifier for this operation, it must be unique per query specification.
+* spec - a set of properties that specify details of the operation.
+    These vary by the kind of operation.
+
+JSON encoding is supported and the following is an example encoding of a query:
+
+```
+from(db:"mydatabase") |> last()
+```
+
+```
+{
+  "operations": [
+    {
+      "kind": "from",
+      "id": "from0",
+      "spec": {
+        "db": "mydatabase"
+      }
+    },
+    {
+      "kind": "last",
+      "id": "last1",
+      "spec": {
+        "column": ""
+      }
+    }
+  ],
+  "edges": [
+    {
+      "parent": "from0",
+      "child": "last1"
+    }
+  ],
+  "resources": {
+    "priority": "high",
+    "concurrency_quota": 0,
+    "memory_bytes_quota": 0
+  }
+}
+```
+
 ### Data model
 
 The data model for the query engine consists of tables, records, columns and streams.
@@ -1261,10 +1315,114 @@ Included with the specification of the language and execution model, is a specif
 
 To submit a query for execution, make an HTTP POST request to the `/v1/query` endpoint.
 
-The POST request may either submit IFQL query text as the `q` parameter, or the body may be a serialization of a query specification.
-When submitting a query specification directly the `Content-Type` header is used to indicate the specific serialization format.
+The POST request may either submit parameters as the POST body or a subset of the parameters as URL query parameters.
+The following parameters are supported:
+
+| Parameter | Description                                                                                                                                       |
+| --------- | -----------                                                                                                                                       |
+| query     | Query is IFQL text describing the query to run.  Only one of `query` or `spec` may be specified. This parameter may be passed as a URL parameter. |
+| spec      | Spec is a query specification. Only one of `query` or `spec` may be specified.                                                                    |
+| dialect   | Dialect is an object defining the options to use when encoding the response.                                                                      |
+
+
+When using the POST body to submit the query the `Content-Type` HTTP header must contain the name of the request encoding being used.
+
+Supported request content types:
+
+* `application/json` - Use a JSON encoding of parameters.
+
+
+
+Multiple response content types will be supported.
+The desired response content type is specified using the `Accept` HTTP header on the request.
+Each response content type will have its own dialect options.
+
+Supported response encodings:
+
+* `test/csv` - Corresponds with the MIME type specified in RFC 4180.
+    Details on the encoding format are specified below.
+
+If no `Accept` header is present it is assumed that `text/csv` was specified.
+The HTTP header `Content-Type` of the response will specify the encoding of the response.
+
+#### Examples requests
+
+Make a request using a query string and URL query parameters:
+
+```
+POST /v1/query?query=%20from%28db%3A%22mydatabse%22%29%20%7C%3E%20last%28%29 HTTP/1.1
+```
+
+Make a request using a query string and the POST body as JSON:
+
+```
+POST /v1/query
+
+
+{
+    "query": "from(db:\"mydatabase\") |> last()"
+}
+```
+
+Make a request using a query specification and the POST body as JSON:
+
+```
+POST /v1/query
+
+
+{
+    "spec": {
+      "operations": [
+        {
+          "kind": "from",
+          "id": "from0",
+          "spec": {
+            "db": "mydatabase"
+          }
+        },
+        {
+          "kind": "last",
+          "id": "last1",
+          "spec": {
+            "column": ""
+          }
+        }
+      ],
+      "edges": [
+        {
+          "parent": "from0",
+          "child": "last1"
+        }
+      ],
+      "resources": {
+        "priority": "high",
+        "concurrency_quota": 0,
+        "memory_bytes_quota": 0
+      }
+    }
+}
+```
+Make a request using a query string and the POST body as JSON.
+Dialect options are specified for the `text/csv` format.
+See below for details on specific dialect options.
+
+```
+POST /v1/query
+
+
+{
+    "query": "from(db:\"mydatabase\") |> last()",
+    "dialect" : {
+        "header": true,
+        "annotations": ["datatype"]
+    }
+}
+```
+
 
 ### Response format
+
+#### CSV
 
 The result of a query is any number of named streams.
 As a stream consists of multiple tables each table is encoded as CSV textual data.
@@ -1276,15 +1434,34 @@ The first declares the data types of each column, the second declares the column
 
 Between each table is an empty line.
 
-In addition to the columns on the tables themselves three additional columns are added.
+Each table may have the following rows:
 
-* meta - the first column is always a meta column.
-    The values `#datatype` and `#error` are the only permissible values in the meta column.
-* result name - the second column is the user defined name of the result to which the record belongs.
-* table - is a unique value to identify each table within a result.
+* annotation rows - a set of rows describing properties about the columns of the table.
+* header row - a single row that defines the column labels.
+* record rows, a set of rows containing the record data, one record per row.
+
+In addition to the columns on the tables themselves three additional columns may be added to the CSV table.
+
+* annotation - Contains the name of an annotation.
+    This column is optional, if it exists it is always the first column.
+    The only valid values for the column are the list of supported annotations or an empty value.
+* result - Contains the name of the result as specified by the query.
+* table - Contains a unique ID for each table within a result.
+
+Columns support the following annotations:
+
+* datatype - a description of the type of data contained within the column.
+* partition - a boolean flag indicating if the column is part of the table's partition key.
 
 
-The row containing a `#datatype` meta specifies the data types of the remaining columns.
+##### Annotations
+
+Annotations rows are prefixed with a comment marker.
+The first column contains the name of the annotation being defined.
+The subsequent columns contain the value of the annotation for the respective columns.
+
+
+The `datatype` annotation specifies the data types of the remaining columns.
 The possible data types are:
 
 | Datatype     | IFQL type | Description                                                                          |
@@ -1298,11 +1475,91 @@ The possible data types are:
 | dateTime     | time      | an instant in time, may be followed with a colon `:` and a description of the format |
 | duration     | duration  | a length of time represented as an unsigned 64-bit integer number of nanoseconds     |
 
-When an error occurs during execution the meta column will contain an `#error` value, followed by column labels for properties of the error.
-The error's properties are contained in the second row of the result.
+The `partition` annotation specifies if the column is part of the table's partition key.
+Possible values are `true` or `false`.
+
+#### Errors
+
+When an error occurs during execution a table will be returned with the first column label as `error` and the second column label as `reference`.
+The error's properties are contained in the second row of the table.
+The `error` column contains the error message and the `reference` column contains a unique reference code that can be used to get further information about the problem.
+
+When an error occurs before any results are materialized then the HTTP status code will indicate an error and the error details will be encoded in the csv table.
+When an error occurs after some results have already been sent to the client the error will be encoded as the next table and the rest of the results will be discarded.
+In such a case the HTTP status code cannot be changed and will remain as 200 OK.
+
+Example error encoding without annotations:
+
+```
+error,reference
+Failed to parse query,897
+```
+
+#### Dialect options
+
+The CSV response format support the following dialect options:
 
 
-Example encoding with two tables in the same result:
+| Option        | Description                                                                                                                                             |
+| ------        | -----------                                                                                                                                             |
+| header        | Header is a boolean value, if true the header row is included, otherwise its is omitted. Defaults to true.                                              |
+| delimiter     | Delimiter is a character to use as the delimiting value between columns.  Defaults to ",".                                                              |
+| quoteChar     | QuoteChar is a character to use to quote values containing the delimiter. Defaults to `"`.                                                              |
+| annotations   | Annotations is a list of annotations that should be encoded. If the list is empty the annotation column is omitted entirely. Defaults to an empty list. |
+| commentPrefix | CommentPrefix is a string prefix to add to comment rows. Defaults to "#". Annotations are always comment rows.                                          |
+
+
+#### Examples
+
+For context the following example tables encode fictitous data in response to this query:
+
+    from(db:"mydb")
+        |> range(start:2018-05-08T20:50:00Z, stop:2018-05-08T20:51:00Z)
+        |> group(by:["_start","_stop", "region", "host"])
+        |> mean()
+        |> group(by:["_start","_stop", "region"])
+        |> yield(name:"mean")
+
+
+Example encoding with of a single table with no annotations:
+
+```
+result,table,_start,_stop,_time,region,host,_value
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
+```
+
+
+Example encoding with two tables in the same result with no annotations:
+
+```
+result,table,_start,_stop,_time,region,host,_value
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
+
+result,table,_start,_stop,_time,region,host,_value
+mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
+mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
+mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
+
+```
+
+Example encoding with two tables in the same result with no annotations and no header row:
+
+```
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
+mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
+
+mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
+mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
+mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
+
+```
+
+Example encoding with two tables in the same result with the datatype annotation:
 
 ```
 #datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
@@ -1316,12 +1573,48 @@ Example encoding with two tables in the same result:
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
+
 ```
 
-Example error encoding:
+Example encoding with two tables in the same result with the datatype and partition annotations:
 
-    #error,message,reference
-    ,Failed to parse query,897
+```
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#partition,false,false,true,true,false,true,false,false
+,result,table,_start,_stop,_time,region,host,_value
+,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
+,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
+,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
 
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#partition,false,false,true,true,false,true,false,false
+,result,table,_start,_stop,_time,region,host,_value
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
+
+```
+
+Example error encoding with the datatype annotation:
+
+```
+#datatype,string,long
+,error,reference
+,Failed to parse query,897
+```
+
+Example error encoding with after a valid table has already been encoded.
+
+```
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+,result,table,_start,_stop,_time,region,host,_value
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
+
+#datatype,string,long
+,error,reference
+,query terminated: reached maximum allowed memory limits,576
+```
 
 [IMPL#327](https://github.com/influxdata/ifql/issues/327) Finalize csv encoding specification

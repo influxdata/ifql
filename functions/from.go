@@ -16,7 +16,7 @@ import (
 const FromKind = "from"
 
 type FromOpSpec struct {
-	Database string   `json:"database"`
+	Database string   `json:"db"`
 	Bucket   string   `json:"bucket"`
 	Hosts    []string `json:"hosts"`
 }
