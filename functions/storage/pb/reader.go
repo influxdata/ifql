@@ -283,6 +283,8 @@ type block struct {
 	uintBuf   []uint64
 	floatBuf  []float64
 	stringBuf []string
+
+	err error
 }
 
 func newBlock(
@@ -311,6 +313,8 @@ func (b *block) RefCount(n int) {
 	//TODO(nathanielc): Have the storageBlock consume the Allocator,
 	// once we have zero-copy serialization over the network
 }
+
+func (b *block) Err() error { return b.err }
 
 func (b *block) wait() {
 	<-b.done
@@ -399,6 +403,7 @@ func (b *block) advance() bool {
 			b.ms.next()
 		case boolPointsType:
 			if b.cols[valueColIdx].Type != execute.TBool {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TBool)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -430,6 +435,7 @@ func (b *block) advance() bool {
 			return true
 		case intPointsType:
 			if b.cols[valueColIdx].Type != execute.TInt {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TInt)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -461,6 +467,7 @@ func (b *block) advance() bool {
 			return true
 		case uintPointsType:
 			if b.cols[valueColIdx].Type != execute.TUInt {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TUInt)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -492,6 +499,7 @@ func (b *block) advance() bool {
 			return true
 		case floatPointsType:
 			if b.cols[valueColIdx].Type != execute.TFloat {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TFloat)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -524,6 +532,7 @@ func (b *block) advance() bool {
 			return true
 		case stringPointsType:
 			if b.cols[valueColIdx].Type != execute.TString {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TString)
 				// TODO: Add error handling
 				// Type changed,
 				return false

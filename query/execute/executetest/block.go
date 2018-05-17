@@ -49,6 +49,8 @@ func (b *Block) Normalize() {
 
 func (b *Block) RefCount(n int) {}
 
+func (b *Block) Err() error { return nil }
+
 func (b *Block) Cols() []execute.ColMeta {
 	return b.ColMeta
 }
