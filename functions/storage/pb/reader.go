@@ -239,6 +239,15 @@ func partitionKeyForSeries(s *ReadResponse_SeriesFrame, readSpec *storage.ReadSp
 			})
 			values = append(values, string(tag.Value))
 		}
+	} else if !readSpec.MergeAll {
+		for _, tag := range s.Tags {
+			cols = append(cols, execute.ColMeta{
+				Label: string(tag.Key),
+				Type:  execute.TString,
+			})
+			values = append(values, string(tag.Value))
+		}
+
 	}
 	return execute.NewPartitionKey(cols, values)
 }
