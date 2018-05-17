@@ -19,7 +19,7 @@ func TestOutputHTTP_NewQuery(t *testing.T) {
 	tests := []querytest.NewQueryTestCase{
 		{
 			Name: "from with database with range",
-			Raw:  `from(db:"mydb") |> outputHTTP(addr: "https://localhost:8081", name:"series1", method:"POST",  timeout: 50s)`, //[{header:"fred" value:"oh no"}, {header:"key2", "value":"oh my!"}, {header:"x-forwarded-for", value:"https://fakeaddr.com"}])`,
+			Raw:  `from(db:"mydb") |> outputHTTP(addr: "https://localhost:8081", name:"series1", method:"POST",  timeout: 50s)`,
 			Want: &query.Spec{
 				Operations: []*query.Operation{
 					{

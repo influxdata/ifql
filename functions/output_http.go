@@ -165,7 +165,7 @@ func createOutputHTTPOpSpec(args query.Arguments, a *query.Administration) (quer
 	return s, nil
 }
 
-// UnmarshalJSON unmarshals and validates OutputHTTPOpSpec
+// UnmarshalJSON unmarshals and validates OutputHTTPOpSpec into JSON.
 func (o *OutputHTTPOpSpec) UnmarshalJSON(b []byte) (err error) {
 
 	if err = json.Unmarshal(b, (*innerOutputHTTPOpSpec)(o)); err != nil {
@@ -266,20 +266,6 @@ func (m *httpOutputMetric) Time() time.Time {
 	return m.t
 }
 
-func (m *httpOutputMetric) setTags(tags map[string]string) {
-	//prealocate the tags
-	m.tags = m.tags[:0]
-	tagsSlab := make([]protocol.Tag, len(tags))
-	//m.tags = make([]*protocol.Tag, 0, len(tags))
-	i := 0
-	for k, v := range tags {
-		tagsSlab[i].Key = k
-		tagsSlab[i].Value = v
-		m.tags = append(m.tags, &tagsSlab[i])
-	}
-	sort.Slice(m.tags, func(i, j int) bool { return m.tags[i].Key < m.tags[j].Key })
-}
-
 type idxType struct {
 	Idx  int
 	Type execute.DataType
@@ -358,9 +344,13 @@ func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block
 		req = req.WithContext(ctx)
 		defer cancel()
 	}
+	var resp *http.Response
+	if t.spec.Spec.NoKeepAlive {
+		resp, err = newOutPutClient().Do(req)
+	} else {
+		resp, err = outputHTTPKeepAliveClient.Do(req)
 
-	//resp, err := outputHTTPKeepAliveClient.Do(req)
-	resp, err := http.Post(t.spec.Spec.Addr, "application/json", pr)
+	}
 	if err != nil {
 		return err
 	}
@@ -368,8 +358,8 @@ func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block
 	defer resp.Body.Close()
 
 	return req.Body.Close()
-	//it := b.Times()
 }
+
 func (t *OutputHTTPTransformation) UpdateWatermark(id execute.DatasetID, pt execute.Time) error {
 	return t.d.UpdateWatermark(pt)
 }
