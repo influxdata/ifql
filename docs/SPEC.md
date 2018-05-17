@@ -1511,6 +1511,16 @@ The CSV response format support the following dialect options:
 
 #### Examples
 
+For context the following example tables encode fictitous data in response to this query:
+
+    from(db:"mydb")
+        |> range(start:2018-05-08T20:50:00Z, stop:2018-05-08T20:51:00Z)
+        |> group(by:["_start","_stop", "region", "host"])
+        |> mean()
+        |> group(by:["_start","_stop", "region"])
+        |> yield(name:"mean")
+
+
 Example encoding with of a single table with no annotations:
 
 ```
