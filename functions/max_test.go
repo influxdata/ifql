@@ -11,12 +11,12 @@ import (
 )
 
 func TestMaxOperation_Marshaling(t *testing.T) {
-	data := []byte(`{"id":"max","kind":"max","spec":{"useRowTime":true}}`)
+	data := []byte(`{"id":"max","kind":"max","spec":{"column":"baz"}}`)
 	op := &query.Operation{
 		ID: "max",
 		Spec: &functions.MaxOpSpec{
 			SelectorConfig: execute.SelectorConfig{
-				UseRowTime: true,
+				Column: "baz",
 			},
 		},
 	}
@@ -33,11 +33,12 @@ func TestMax_Process(t *testing.T) {
 		{
 			name: "first",
 			data: &executetest.Block{
+				KeyCols: []string{"t1"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString},
+					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 10.0, "a", "y"},
@@ -59,11 +60,12 @@ func TestMax_Process(t *testing.T) {
 		{
 			name: "last",
 			data: &executetest.Block{
+				KeyCols: []string{"t1"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString},
+					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 7.0, "a", "y"},
@@ -85,11 +87,12 @@ func TestMax_Process(t *testing.T) {
 		{
 			name: "middle",
 			data: &executetest.Block{
+				KeyCols: []string{"t1"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString},
+					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 7.0, "a", "y"},

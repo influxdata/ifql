@@ -104,7 +104,6 @@ type FromProcedureSpec struct {
 	MergeAll    bool
 	GroupKeys   []string
 	GroupExcept []string
-	GroupKeep   []string
 
 	AggregateSet    bool
 	AggregateMethod string
@@ -218,7 +217,6 @@ func createFromSource(prSpec plan.ProcedureSpec, dsid execute.DatasetID, a execu
 			MergeAll:        spec.MergeAll,
 			GroupKeys:       spec.GroupKeys,
 			GroupExcept:     spec.GroupExcept,
-			GroupKeep:       spec.GroupKeep,
 			AggregateMethod: spec.AggregateMethod,
 		},
 		bounds,

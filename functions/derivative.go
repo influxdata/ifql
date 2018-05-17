@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/influxdata/ifql/interpreter"
 	"github.com/influxdata/ifql/query"
 	"github.com/influxdata/ifql/query/execute"
 	"github.com/influxdata/ifql/query/plan"
@@ -16,6 +17,8 @@ const DerivativeKind = "derivative"
 type DerivativeOpSpec struct {
 	Unit        query.Duration `json:"unit"`
 	NonNegative bool           `json:"non_negative"`
+	Columns     []string       `json:"columns"`
+	TimeSrc     string         `json:"time_src"`
 }
 
 var derivativeSignature = query.DefaultFunctionSignature()
@@ -23,6 +26,8 @@ var derivativeSignature = query.DefaultFunctionSignature()
 func init() {
 	derivativeSignature.Params["unit"] = semantic.Duration
 	derivativeSignature.Params["nonNegative"] = semantic.Bool
+	derivativeSignature.Params["columns"] = semantic.NewArrayType(semantic.String)
+	derivativeSignature.Params["timeSrc"] = semantic.String
 
 	query.RegisterFunction(DerivativeKind, createDerivativeOpSpec, derivativeSignature)
 	query.RegisterOpSpec(DerivativeKind, newDerivativeOp)
@@ -51,7 +56,25 @@ func createDerivativeOpSpec(args query.Arguments, a *query.Administration) (quer
 	} else if ok {
 		spec.NonNegative = nn
 	}
+	if timeCol, ok, err := args.GetString("timeSrc"); err != nil {
+		return nil, err
+	} else if ok {
+		spec.TimeSrc = timeCol
+	} else {
+		spec.TimeSrc = execute.DefaultTimeColLabel
+	}
 
+	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
+		return nil, err
+	} else if ok {
+		columns, err := interpreter.ToStringArray(cols)
+		if err != nil {
+			return nil, err
+		}
+		spec.Columns = columns
+	} else {
+		spec.Columns = []string{execute.DefaultValueColLabel}
+	}
 	return spec, nil
 }
 
@@ -66,6 +89,8 @@ func (s *DerivativeOpSpec) Kind() query.OperationKind {
 type DerivativeProcedureSpec struct {
 	Unit        query.Duration `json:"unit"`
 	NonNegative bool           `json:"non_negative"`
+	Columns     []string       `json:"columns"`
+	TimeCol     string         `json:"time_col"`
 }
 
 func newDerivativeProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -77,6 +102,8 @@ func newDerivativeProcedure(qs query.OperationSpec, pa plan.Administration) (pla
 	return &DerivativeProcedureSpec{
 		Unit:        spec.Unit,
 		NonNegative: spec.NonNegative,
+		Columns:     spec.Columns,
+		TimeCol:     spec.TimeSrc,
 	}, nil
 }
 
@@ -86,6 +113,10 @@ func (s *DerivativeProcedureSpec) Kind() plan.ProcedureKind {
 func (s *DerivativeProcedureSpec) Copy() plan.ProcedureSpec {
 	ns := new(DerivativeProcedureSpec)
 	*ns = *s
+	if s.Columns != nil {
+		ns.Columns = make([]string, len(s.Columns))
+		copy(ns.Columns, s.Columns)
+	}
 	return ns
 }
 
@@ -106,6 +137,8 @@ type derivativeTransformation struct {
 
 	unit        time.Duration
 	nonNegative bool
+	columns     []string
+	timeCol     string
 }
 
 func NewDerivativeTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *DerivativeProcedureSpec) *derivativeTransformation {
@@ -114,79 +147,104 @@ func NewDerivativeTransformation(d execute.Dataset, cache execute.BlockBuilderCa
 		cache:       cache,
 		unit:        time.Duration(spec.Unit),
 		nonNegative: spec.NonNegative,
+		columns:     spec.Columns,
+		timeCol:     spec.TimeCol,
 	}
 }
 
-func (t *derivativeTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *derivativeTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *derivativeTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(b)
-	if new {
-		cols := b.Cols()
-		for j, c := range cols {
-			switch c.Kind {
-			case execute.TimeColKind:
-				builder.AddCol(c)
-			case execute.TagColKind:
-				builder.AddCol(c)
-				if c.Common {
-					builder.SetCommonString(j, b.Tags()[c.Label])
-				}
-			case execute.ValueColKind:
-				dc := c
-				// Derivative always results in a float64
-				dc.Type = execute.TFloat
-				builder.AddCol(dc)
-			}
-		}
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("derivative found duplicate block with key: %v", b.Key())
 	}
 	cols := b.Cols()
 	derivatives := make([]*derivative, len(cols))
+	timeIdx := -1
 	for j, c := range cols {
-		if c.IsValue() {
-			d := newDerivative(j, t.unit, t.nonNegative)
-			derivatives[j] = d
+		found := false
+		for _, label := range t.columns {
+			if c.Label == label {
+				found = true
+				break
+			}
+		}
+		if c.Label == t.timeCol {
+			timeIdx = j
+		}
+
+		if found {
+			dc := c
+			// Derivative always results in a float
+			dc.Type = execute.TFloat
+			builder.AddCol(dc)
+			derivatives[j] = newDerivative(j, t.unit, t.nonNegative)
+		} else {
+			builder.AddCol(c)
 		}
 	}
+	if timeIdx < 0 {
+		return fmt.Errorf("no column %q exists", t.timeCol)
+	}
 
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
-		for i, t := range ts {
-			include := false
-			for _, d := range derivatives {
-				if d == nil {
-					continue
-				}
-				var ok bool
-				j := d.col
-				switch cols[j].Type {
-				case execute.TInt:
-					ok = d.updateInt(t, rr.AtInt(i, j))
-				case execute.TUInt:
-					ok = d.updateUInt(t, rr.AtUInt(i, j))
-				case execute.TFloat:
-					ok = d.updateFloat(t, rr.AtFloat(i, j))
-				}
-				include = include || ok
-			}
-			if include {
-				for j, c := range cols {
-					switch c.Kind {
-					case execute.TimeColKind:
-						builder.AppendTime(j, rr.AtTime(i, j))
-					case execute.TagColKind:
-						builder.AppendString(j, rr.AtString(i, j))
-					case execute.ValueColKind:
-						//TODO(nathanielc): Write null markers when we have support for null values.
-						builder.AppendFloat(j, derivatives[j].value())
+	// We need to drop the first row since its derivative is undefined
+	firstIdx := 1
+	return b.Do(func(cr execute.ColReader) error {
+		l := cr.Len()
+		for j, c := range cols {
+			d := derivatives[j]
+			switch c.Type {
+			case execute.TBool:
+				builder.AppendBools(j, cr.Bools(j)[firstIdx:])
+			case execute.TInt:
+				if d != nil {
+					for i := 0; i < l; i++ {
+						time := cr.Times(timeIdx)[i]
+						v := d.updateInt(time, cr.Ints(j)[i])
+						if i != 0 || firstIdx == 0 {
+							builder.AppendFloat(j, v)
+						}
 					}
+				} else {
+					builder.AppendInts(j, cr.Ints(j)[firstIdx:])
 				}
+			case execute.TUInt:
+				if d != nil {
+					for i := 0; i < l; i++ {
+						time := cr.Times(timeIdx)[i]
+						v := d.updateUInt(time, cr.UInts(j)[i])
+						if i != 0 || firstIdx == 0 {
+							builder.AppendFloat(j, v)
+						}
+					}
+				} else {
+					builder.AppendUInts(j, cr.UInts(j)[firstIdx:])
+				}
+			case execute.TFloat:
+				if d != nil {
+					for i := 0; i < l; i++ {
+						time := cr.Times(timeIdx)[i]
+						v := d.updateFloat(time, cr.Floats(j)[i])
+						if i != 0 || firstIdx == 0 {
+							builder.AppendFloat(j, v)
+						}
+					}
+				} else {
+					builder.AppendFloats(j, cr.Floats(j)[firstIdx:])
+				}
+			case execute.TString:
+				builder.AppendStrings(j, cr.Strings(j)[firstIdx:])
+			case execute.TTime:
+				builder.AppendTimes(j, cr.Times(j)[firstIdx:])
 			}
 		}
+		// Now that we skipped the first row, start at 0 for the rest of the batches
+		firstIdx = 0
+		return nil
 	})
-
-	return nil
 }
 
 func (t *derivativeTransformation) UpdateWatermark(id execute.DatasetID, mark execute.Time) error {
@@ -218,44 +276,41 @@ type derivative struct {
 	pUIntValue  uint64
 	pFloatValue float64
 	pTime       execute.Time
-
-	v float64
 }
 
-func (d *derivative) value() float64 {
-	return d.v
-}
-
-func (d *derivative) updateInt(t execute.Time, v int64) bool {
+func (d *derivative) updateInt(t execute.Time, v int64) float64 {
 	if d.first {
 		d.pTime = t
 		d.pIntValue = v
 		d.first = false
-		d.v = math.NaN()
-		return false
+		return math.NaN()
 	}
 
 	diff := float64(v - d.pIntValue)
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		diff = float64(v)
+	}
 	elapsed := float64(time.Duration(t-d.pTime)) / d.unit
 
 	d.pTime = t
 	d.pIntValue = v
 
 	if d.nonNegative && diff < 0 {
-		d.v = math.NaN()
-		return false
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		return float64(v)
 	}
 
-	d.v = diff / elapsed
-	return true
+	return diff / elapsed
 }
-func (d *derivative) updateUInt(t execute.Time, v uint64) bool {
+func (d *derivative) updateUInt(t execute.Time, v uint64) float64 {
 	if d.first {
 		d.pTime = t
 		d.pUIntValue = v
 		d.first = false
-		d.v = math.NaN()
-		return false
+		return math.NaN()
 	}
 
 	var diff float64
@@ -265,39 +320,36 @@ func (d *derivative) updateUInt(t execute.Time, v uint64) bool {
 	} else {
 		diff = float64(v - d.pUIntValue)
 	}
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		diff = float64(v)
+	}
 	elapsed := float64(time.Duration(t-d.pTime)) / d.unit
 
 	d.pTime = t
 	d.pUIntValue = v
 
-	if d.nonNegative && diff < 0 {
-		d.v = math.NaN()
-		return false
-	}
-
-	d.v = diff / elapsed
-	return true
+	return diff / elapsed
 }
-func (d *derivative) updateFloat(t execute.Time, v float64) bool {
+func (d *derivative) updateFloat(t execute.Time, v float64) float64 {
 	if d.first {
 		d.pTime = t
 		d.pFloatValue = v
 		d.first = false
-		d.v = math.NaN()
-		return false
+		return math.NaN()
 	}
 
 	diff := v - d.pFloatValue
+	if d.nonNegative && diff < 0 {
+		//TODO(nathanielc): Should we return null when we have null support
+		// Or should we assume the previous is 0?
+		diff = v
+	}
 	elapsed := float64(time.Duration(t-d.pTime)) / d.unit
 
 	d.pTime = t
 	d.pFloatValue = v
 
-	if d.nonNegative && diff < 0 {
-		d.v = math.NaN()
-		return false
-	}
-
-	d.v = diff / elapsed
-	return true
+	return diff / elapsed
 }

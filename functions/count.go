@@ -29,7 +29,7 @@ func createCountOpSpec(args query.Arguments, a *query.Administration) (query.Ope
 	}
 	s := new(CountOpSpec)
 	if err := s.AggregateConfig.ReadArgs(args); err != nil {
-		return s, err
+		return nil, err
 	}
 	return s, nil
 }
@@ -112,24 +112,19 @@ func createCountTransformation(id execute.DatasetID, mode execute.AccumulationMo
 }
 
 func (a *CountAgg) NewBoolAgg() execute.DoBoolAgg {
-	a.count = 0
-	return a
+	return new(CountAgg)
 }
 func (a *CountAgg) NewIntAgg() execute.DoIntAgg {
-	a.count = 0
-	return a
+	return new(CountAgg)
 }
 func (a *CountAgg) NewUIntAgg() execute.DoUIntAgg {
-	a.count = 0
-	return a
+	return new(CountAgg)
 }
 func (a *CountAgg) NewFloatAgg() execute.DoFloatAgg {
-	a.count = 0
-	return a
+	return new(CountAgg)
 }
 func (a *CountAgg) NewStringAgg() execute.DoStringAgg {
-	a.count = 0
-	return a
+	return new(CountAgg)
 }
 
 func (a *CountAgg) DoBool(vs []bool) {

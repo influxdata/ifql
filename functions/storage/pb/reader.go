@@ -1,7 +1,6 @@
 package pb
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -139,9 +138,9 @@ func (bi *bockIterator) Do(f func(execute.Block) error) error {
 		frame := ms.next()
 		s := frame.GetSeries()
 		typ := convertDataType(s.DataType)
-		tags, keptTags := bi.determineBlockTags(s)
-		k := appendSeriesKey(nil, s, &bi.readSpec)
-		block := newBlock(bi.bounds, tags, keptTags, k, ms, &bi.readSpec, typ)
+		key := partitionKeyForSeries(s, &bi.readSpec)
+		cols := bi.determineBlockCols(s, typ)
+		block := newBlock(bi.bounds, key, cols, ms, &bi.readSpec, s.Tags)
 
 		if err := f(block); err != nil {
 			// TODO(nathanielc): Close streams since we have abandoned the request
@@ -181,127 +180,79 @@ func convertDataType(t ReadResponse_DataType) execute.DataType {
 	}
 }
 
-func (bi *bockIterator) determineBlockTags(s *ReadResponse_SeriesFrame) (tags, keptTags execute.Tags) {
-	if len(bi.readSpec.GroupKeys) > 0 {
-		tags = make(execute.Tags, len(bi.readSpec.GroupKeys))
-		for _, key := range bi.readSpec.GroupKeys {
-			for _, tag := range s.Tags {
-				if string(tag.Key) == key {
-					tags[key] = string(tag.Value)
-					break
-				}
-			}
-		}
-		if len(bi.readSpec.GroupKeep) > 0 {
-			keptTags = make(execute.Tags, len(bi.readSpec.GroupKeep))
-			for _, key := range bi.readSpec.GroupKeep {
-				for _, tag := range s.Tags {
-					if string(tag.Key) == key {
-						keptTags[key] = string(tag.Value)
-						break
-					}
-				}
-			}
-		}
-	} else if len(bi.readSpec.GroupExcept) > 0 {
-		tags = make(execute.Tags, len(s.Tags)-len(bi.readSpec.GroupExcept))
-		keptTags = make(execute.Tags, len(bi.readSpec.GroupKeep))
-	TAGS:
-		for _, t := range s.Tags {
-			k := string(t.Key)
-			for _, key := range bi.readSpec.GroupKeep {
-				if k == key {
-					keptTags[key] = string(t.Value)
-					continue TAGS
-				}
-			}
-			for _, key := range bi.readSpec.GroupExcept {
-				if k == key {
-					continue TAGS
-				}
-			}
-			tags[k] = string(t.Value)
-		}
-	} else if !bi.readSpec.MergeAll {
-		tags = make(execute.Tags, len(s.Tags))
-		for _, t := range s.Tags {
-			tags[string(t.Key)] = string(t.Value)
-		}
-	} else {
-		keptTags = make(execute.Tags, len(bi.readSpec.GroupKeep))
-		for _, t := range s.Tags {
-			k := string(t.Key)
-			for _, key := range bi.readSpec.GroupKeep {
-				if k == key {
-					keptTags[key] = string(t.Value)
-				}
-			}
+const (
+	startColIdx = 0
+	stopColIdx  = 1
+	timeColIdx  = 2
+	valueColIdx = 3
+)
+
+func (bi *bockIterator) determineBlockCols(s *ReadResponse_SeriesFrame, typ execute.DataType) []execute.ColMeta {
+	cols := make([]execute.ColMeta, 4+len(s.Tags))
+	cols[startColIdx] = execute.ColMeta{
+		Label: execute.DefaultStartColLabel,
+		Type:  execute.TTime,
+	}
+	cols[stopColIdx] = execute.ColMeta{
+		Label: execute.DefaultStopColLabel,
+		Type:  execute.TTime,
+	}
+	cols[timeColIdx] = execute.ColMeta{
+		Label: execute.DefaultTimeColLabel,
+		Type:  execute.TTime,
+	}
+	cols[valueColIdx] = execute.ColMeta{
+		Label: execute.DefaultValueColLabel,
+		Type:  typ,
+	}
+	for j, tag := range s.Tags {
+		cols[4+j] = execute.ColMeta{
+			Label: string(tag.Key),
+			Type:  execute.TString,
 		}
 	}
-	return
+	return cols
 }
 
-func appendSeriesKey(b key, s *ReadResponse_SeriesFrame, readSpec *storage.ReadSpec) key {
-	appendTag := func(t Tag) {
-		b = append(b, t.Key...)
-		b = append(b, '=')
-		b = append(b, t.Value...)
-	}
+func partitionKeyForSeries(s *ReadResponse_SeriesFrame, readSpec *storage.ReadSpec) execute.PartitionKey {
+	cols := make([]execute.ColMeta, 0, len(s.Tags))
+	values := make([]interface{}, 0, len(s.Tags))
 	if len(readSpec.GroupKeys) > 0 {
-		for i, key := range readSpec.GroupKeys {
-			if i != 0 {
-				b = append(b, ',')
+		for _, tag := range s.Tags {
+			if !execute.ContainsStr(readSpec.GroupKeys, string(tag.Key)) {
+				continue
 			}
-			for _, tag := range s.Tags {
-				if string(tag.Key) == key {
-					appendTag(tag)
-					break
-				}
-			}
+			cols = append(cols, execute.ColMeta{
+				Label: string(tag.Key),
+				Type:  execute.TString,
+			})
+			values = append(values, string(tag.Value))
 		}
 	} else if len(readSpec.GroupExcept) > 0 {
-		i := 0
-	TAGS:
-		for _, t := range s.Tags {
-			k := string(t.Key)
-			for _, key := range readSpec.GroupKeep {
-				if k == key {
-					continue TAGS
-				}
+		for _, tag := range s.Tags {
+			if !execute.ContainsStr(readSpec.GroupExcept, string(tag.Key)) {
+				continue
 			}
-			for _, key := range readSpec.GroupExcept {
-				if k == key {
-					continue TAGS
-				}
-			}
-			if i != 0 {
-				b = append(b, ',')
-			}
-			appendTag(t)
-			i++
-		}
-	} else if !readSpec.MergeAll {
-		for i, t := range s.Tags {
-			if i != 0 {
-				b = append(b, ',')
-			}
-			appendTag(t)
+			cols = append(cols, execute.ColMeta{
+				Label: string(tag.Key),
+				Type:  execute.TString,
+			})
+			values = append(values, string(tag.Value))
 		}
 	}
-	return b
+	return execute.NewPartitionKey(cols, values)
 }
 
 // block implement OneTimeBlock as it can only be read once.
 // Since it can only be read once it is also a ValueIterator for itself.
 type block struct {
 	bounds execute.Bounds
-	tags   execute.Tags
-	tagKey key
-	// keptTags is a set of non common tags.
-	keptTags execute.Tags
-	// colMeta always has at least two columns, where the first is a TimeCol
-	// and the second is any Value column.
-	colMeta []execute.ColMeta
+	key    execute.PartitionKey
+	cols   []execute.ColMeta
+
+	// cache of the tags on the current series.
+	// len(tags) == len(colMeta)
+	tags [][]byte
 
 	readSpec *storage.ReadSpec
 
@@ -309,10 +260,10 @@ type block struct {
 
 	ms *mergedStreams
 
-	// The index of the column to iterate
-	col int
+	// The current number of records in memory
+	l int
 	// colBufs are the buffers for the given columns.
-	colBufs [2]interface{}
+	colBufs []interface{}
 
 	// resuable buffer for the time column
 	timeBuf []execute.Time
@@ -325,41 +276,26 @@ type block struct {
 	stringBuf []string
 }
 
-func newBlock(bounds execute.Bounds, tags, keptTags execute.Tags, tagKey key, ms *mergedStreams, readSpec *storage.ReadSpec, typ execute.DataType) *block {
-	colMeta := make([]execute.ColMeta, 2, 2+len(tags)+len(keptTags))
-	colMeta[0] = execute.TimeCol
-	colMeta[1] = execute.ColMeta{
-		Label: execute.DefaultValueColLabel,
-		Type:  typ,
-		Kind:  execute.ValueColKind,
-	}
-
-	for _, k := range tags.Keys() {
-		colMeta = append(colMeta, execute.ColMeta{
-			Label:  k,
-			Type:   execute.TString,
-			Kind:   execute.TagColKind,
-			Common: true,
-		})
-	}
-	for _, k := range keptTags.Keys() {
-		colMeta = append(colMeta, execute.ColMeta{
-			Label:  k,
-			Type:   execute.TString,
-			Kind:   execute.TagColKind,
-			Common: false,
-		})
-	}
-	return &block{
+func newBlock(
+	bounds execute.Bounds,
+	key execute.PartitionKey,
+	cols []execute.ColMeta,
+	ms *mergedStreams,
+	readSpec *storage.ReadSpec,
+	tags []Tag,
+) *block {
+	b := &block{
 		bounds:   bounds,
-		tagKey:   tagKey,
-		tags:     tags,
-		keptTags: keptTags,
-		colMeta:  colMeta,
+		key:      key,
+		tags:     make([][]byte, len(cols)),
+		colBufs:  make([]interface{}, len(cols)),
+		cols:     cols,
 		readSpec: readSpec,
 		ms:       ms,
 		done:     make(chan struct{}),
 	}
+	b.readTags(tags)
+	return b
 }
 
 func (b *block) RefCount(n int) {
@@ -371,136 +307,64 @@ func (b *block) wait() {
 	<-b.done
 }
 
-// onetime satisfies the OneTimeBlock interface since this block may only be read once.
-func (b *block) onetime() {}
-
-func (b *block) Bounds() execute.Bounds {
-	return b.bounds
-}
-func (b *block) Tags() execute.Tags {
-	return b.tags
+func (b *block) Key() execute.PartitionKey {
+	return b.key
 }
 func (b *block) Cols() []execute.ColMeta {
-	return b.colMeta
+	return b.cols
 }
 
-func (b *block) Col(c int) execute.ValueIterator {
-	b.col = c
-	return b
-}
-
-func (b *block) Times() execute.ValueIterator {
-	return b.Col(0)
-}
-func (b *block) Values() (execute.ValueIterator, error) {
-	return b.Col(1), nil
-}
-
-func (b *block) DoBool(f func([]bool, execute.RowReader)) {
-	execute.CheckColType(b.colMeta[b.col], execute.TBool)
-	for b.advance() {
-		f(b.colBufs[b.col].([]bool), b)
-	}
-	close(b.done)
-}
-func (b *block) DoInt(f func([]int64, execute.RowReader)) {
-	execute.CheckColType(b.colMeta[b.col], execute.TInt)
-	for b.advance() {
-		f(b.colBufs[b.col].([]int64), b)
-	}
-	close(b.done)
-}
-func (b *block) DoUInt(f func([]uint64, execute.RowReader)) {
-	execute.CheckColType(b.colMeta[b.col], execute.TUInt)
-	for b.advance() {
-		f(b.colBufs[b.col].([]uint64), b)
-	}
-	close(b.done)
-}
-func (b *block) DoFloat(f func([]float64, execute.RowReader)) {
-	execute.CheckColType(b.colMeta[b.col], execute.TFloat)
-	for b.advance() {
-		f(b.colBufs[b.col].([]float64), b)
-	}
-	close(b.done)
-}
-func (b *block) DoString(f func([]string, execute.RowReader)) {
+// onetime satisfies the OneTimeBlock interface since this block may only be read once.
+func (b *block) onetime() {}
+func (b *block) Do(f func(execute.ColReader) error) error {
 	defer close(b.done)
-
-	meta := b.colMeta[b.col]
-	execute.CheckColType(meta, execute.TString)
-	if meta.IsTag() {
-		// Handle creating a strs slice that can be ranged according to actual data received.
-		var strs []string
-		var value string
-		if meta.Common {
-			value = b.tags[meta.Label]
-		} else {
-			value = b.keptTags[meta.Label]
-		}
-		for b.advance() {
-			l := len(b.timeBuf)
-			if cap(strs) < l {
-				strs = make([]string, l)
-				for i := range strs {
-					strs[i] = value
-				}
-			} else if len(strs) < l {
-				new := strs[len(strs)-1 : l]
-				for i := range new {
-					new[i] = value
-				}
-				strs = strs[0:l]
-			} else {
-				strs = strs[0:l]
-			}
-			f(strs, b)
-		}
-		return
-	}
-	// Do ordinary range over column data.
 	for b.advance() {
-		f(b.colBufs[b.col].([]string), b)
+		if err := f(b); err != nil {
+			return err
+		}
 	}
-}
-func (b *block) DoTime(f func([]execute.Time, execute.RowReader)) {
-	execute.CheckColType(b.colMeta[b.col], execute.TTime)
-	for b.advance() {
-		f(b.colBufs[b.col].([]execute.Time), b)
-	}
-	close(b.done)
+	return nil
 }
 
-func (b *block) AtBool(i, j int) bool {
-	execute.CheckColType(b.colMeta[j], execute.TBool)
-	return b.colBufs[j].([]bool)[i]
+func (b *block) Len() int {
+	return b.l
 }
-func (b *block) AtInt(i, j int) int64 {
-	execute.CheckColType(b.colMeta[j], execute.TInt)
-	return b.colBufs[j].([]int64)[i]
+
+func (b *block) Bools(j int) []bool {
+	execute.CheckColType(b.cols[j], execute.TBool)
+	return b.colBufs[j].([]bool)
 }
-func (b *block) AtUInt(i, j int) uint64 {
-	execute.CheckColType(b.colMeta[j], execute.TUInt)
-	return b.colBufs[j].([]uint64)[i]
+func (b *block) Ints(j int) []int64 {
+	execute.CheckColType(b.cols[j], execute.TInt)
+	return b.colBufs[j].([]int64)
 }
-func (b *block) AtFloat(i, j int) float64 {
-	execute.CheckColType(b.colMeta[j], execute.TFloat)
-	return b.colBufs[j].([]float64)[i]
+func (b *block) UInts(j int) []uint64 {
+	execute.CheckColType(b.cols[j], execute.TUInt)
+	return b.colBufs[j].([]uint64)
 }
-func (b *block) AtString(i, j int) string {
-	meta := b.colMeta[j]
-	execute.CheckColType(meta, execute.TString)
-	if meta.IsTag() {
-		if meta.Common {
-			return b.tags[meta.Label]
-		}
-		return b.keptTags[meta.Label]
+func (b *block) Floats(j int) []float64 {
+	execute.CheckColType(b.cols[j], execute.TFloat)
+	return b.colBufs[j].([]float64)
+}
+func (b *block) Strings(j int) []string {
+	execute.CheckColType(b.cols[j], execute.TString)
+	return b.colBufs[j].([]string)
+}
+func (b *block) Times(j int) []execute.Time {
+	execute.CheckColType(b.cols[j], execute.TTime)
+	return b.colBufs[j].([]execute.Time)
+}
+
+// readTags populates b.tags with the provided tags
+func (b *block) readTags(tags []Tag) {
+	for j := range b.tags {
+		b.tags[j] = nil
 	}
-	return b.colBufs[j].([]string)[i]
-}
-func (b *block) AtTime(i, j int) execute.Time {
-	execute.CheckColType(b.colMeta[j], execute.TTime)
-	return b.colBufs[j].([]execute.Time)[i]
+	for _, t := range tags {
+		k := string(t.Key)
+		j := execute.ColIdx(k, b.cols)
+		b.tags[j] = t.Value
+	}
 }
 
 func (b *block) advance() bool {
@@ -515,25 +379,17 @@ func (b *block) advance() bool {
 
 		switch p := b.ms.peek(); readFrameType(p) {
 		case seriesType:
-			if b.ms.key().Compare(b.tagKey) != 0 {
+			if !b.ms.key().Equal(b.key) {
 				// We have reached the end of data for this block
 				return false
 			}
 			s := p.GetSeries()
-			// Populate keptTags with new series values
-			b.keptTags = make(execute.Tags, len(b.readSpec.GroupKeep))
-			for _, t := range s.Tags {
-				k := string(t.Key)
-				for _, key := range b.readSpec.GroupKeep {
-					if k == key {
-						b.keptTags[key] = string(t.Value)
-					}
-				}
-			}
+			b.readTags(s.Tags)
+
 			// Advance to next frame
 			b.ms.next()
 		case boolPointsType:
-			if b.colMeta[1].Type != execute.TBool {
+			if b.cols[valueColIdx].Type != execute.TBool {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -542,6 +398,7 @@ func (b *block) advance() bool {
 			frame := b.ms.next()
 			p := frame.GetBooleanPoints()
 			l := len(p.Timestamps)
+			b.l = l
 			if l > cap(b.timeBuf) {
 				b.timeBuf = make([]execute.Time, l)
 			} else {
@@ -557,11 +414,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.boolBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.boolBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.boolBuf
+			b.appendTags()
+			b.appendBounds()
 			return true
 		case intPointsType:
-			if b.colMeta[1].Type != execute.TInt {
+			if b.cols[valueColIdx].Type != execute.TInt {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -570,6 +429,7 @@ func (b *block) advance() bool {
 			frame := b.ms.next()
 			p := frame.GetIntegerPoints()
 			l := len(p.Timestamps)
+			b.l = l
 			if l > cap(b.timeBuf) {
 				b.timeBuf = make([]execute.Time, l)
 			} else {
@@ -585,11 +445,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.intBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.intBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.intBuf
+			b.appendTags()
+			b.appendBounds()
 			return true
 		case uintPointsType:
-			if b.colMeta[1].Type != execute.TUInt {
+			if b.cols[valueColIdx].Type != execute.TUInt {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -598,6 +460,7 @@ func (b *block) advance() bool {
 			frame := b.ms.next()
 			p := frame.GetUnsignedPoints()
 			l := len(p.Timestamps)
+			b.l = l
 			if l > cap(b.timeBuf) {
 				b.timeBuf = make([]execute.Time, l)
 			} else {
@@ -613,11 +476,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.uintBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.uintBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.uintBuf
+			b.appendTags()
+			b.appendBounds()
 			return true
 		case floatPointsType:
-			if b.colMeta[1].Type != execute.TFloat {
+			if b.cols[valueColIdx].Type != execute.TFloat {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -627,6 +492,7 @@ func (b *block) advance() bool {
 			p := frame.GetFloatPoints()
 
 			l := len(p.Timestamps)
+			b.l = l
 			if l > cap(b.timeBuf) {
 				b.timeBuf = make([]execute.Time, l)
 			} else {
@@ -642,11 +508,13 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.floatBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.floatBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.floatBuf
+			b.appendTags()
+			b.appendBounds()
 			return true
 		case stringPointsType:
-			if b.colMeta[1].Type != execute.TString {
+			if b.cols[valueColIdx].Type != execute.TString {
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -656,6 +524,7 @@ func (b *block) advance() bool {
 			p := frame.GetStringPoints()
 
 			l := len(p.Timestamps)
+			b.l = l
 			if l > cap(b.timeBuf) {
 				b.timeBuf = make([]execute.Time, l)
 			} else {
@@ -671,18 +540,63 @@ func (b *block) advance() bool {
 				b.timeBuf[i] = execute.Time(c)
 				b.stringBuf[i] = p.Values[i]
 			}
-			b.colBufs[0] = b.timeBuf
-			b.colBufs[1] = b.stringBuf
+			b.colBufs[timeColIdx] = b.timeBuf
+			b.colBufs[valueColIdx] = b.stringBuf
+			b.appendTags()
+			b.appendBounds()
 			return true
 		}
 	}
 	return false
 }
 
+// appendTags fills the colBufs for the tag columns with the tag value.
+func (b *block) appendTags() {
+	for j := range b.cols {
+		v := b.tags[j]
+		if v != nil {
+			if b.colBufs[j] == nil {
+				b.colBufs[j] = make([]string, b.l)
+			}
+			colBuf := b.colBufs[j].([]string)
+			if cap(colBuf) < b.l {
+				colBuf = make([]string, b.l)
+			} else {
+				colBuf = colBuf[:b.l]
+			}
+			vStr := string(v)
+			for i := range colBuf {
+				colBuf[i] = vStr
+			}
+			b.colBufs[j] = colBuf
+		}
+	}
+}
+
+// appendBounds fills the colBufs for the time bounds
+func (b *block) appendBounds() {
+	bounds := []execute.Time{b.bounds.Start, b.bounds.Stop}
+	for j := range []int{startColIdx, stopColIdx} {
+		if b.colBufs[j] == nil {
+			b.colBufs[j] = make([]execute.Time, b.l)
+		}
+		colBuf := b.colBufs[j].([]execute.Time)
+		if cap(colBuf) < b.l {
+			colBuf = make([]execute.Time, b.l)
+		} else {
+			colBuf = colBuf[:b.l]
+		}
+		for i := range colBuf {
+			colBuf[i] = bounds[j]
+		}
+		b.colBufs[j] = colBuf
+	}
+}
+
 type streamState struct {
 	stream     Storage_ReadClient
 	rep        ReadResponse
-	currentKey key
+	currentKey execute.PartitionKey
 	readSpec   *storage.ReadSpec
 	finished   bool
 }
@@ -714,7 +628,7 @@ func (s *streamState) more() bool {
 	return true
 }
 
-func (s *streamState) key() key {
+func (s *streamState) key() execute.PartitionKey {
 	return s.currentKey
 }
 
@@ -722,7 +636,7 @@ func (s *streamState) computeKey() {
 	// Determine new currentKey
 	if p := s.peek(); readFrameType(p) == seriesType {
 		series := p.GetSeries()
-		s.currentKey = appendSeriesKey(s.currentKey[0:0], series, s.readSpec)
+		s.currentKey = partitionKeyForSeries(series, s.readSpec)
 	}
 }
 func (s *streamState) next() ReadResponse_Frame {
@@ -734,29 +648,13 @@ func (s *streamState) next() ReadResponse_Frame {
 	return frame
 }
 
-type key []byte
-
-// Compare keys, a nil key is always greater.
-func (k key) Compare(o key) int {
-	if k == nil && o == nil {
-		return 0
-	}
-	if k == nil {
-		return 1
-	}
-	if o == nil {
-		return -1
-	}
-	return bytes.Compare([]byte(k), []byte(o))
-}
-
 type mergedStreams struct {
 	streams    []*streamState
-	currentKey key
+	currentKey execute.PartitionKey
 	i          int
 }
 
-func (s *mergedStreams) key() key {
+func (s *mergedStreams) key() execute.PartitionKey {
 	if len(s.streams) == 1 {
 		return s.streams[0].key()
 	}
@@ -782,15 +680,10 @@ func (s *mergedStreams) more() bool {
 		return s.determineNewKey()
 	}
 	if s.streams[s.i].more() {
-		cmp := s.streams[s.i].key().Compare(s.currentKey)
-		switch cmp {
-		case 0:
+		if s.streams[s.i].key().Equal(s.currentKey) {
 			return true
-		case 1:
-			return s.advance()
-		case -1:
-			panic(errors.New("found smaller key, this should not be possible"))
 		}
+		return s.advance()
 	}
 	return s.advance()
 }
@@ -808,24 +701,18 @@ func (s *mergedStreams) advance() bool {
 
 func (s *mergedStreams) determineNewKey() bool {
 	minIdx := -1
-	var minKey key
+	var minKey execute.PartitionKey
 	for i, stream := range s.streams {
 		if !stream.more() {
 			continue
 		}
 		k := stream.key()
-		if k.Compare(minKey) < 0 {
+		if k.Less(minKey) {
 			minIdx = i
 			minKey = k
 		}
 	}
-	l := len(minKey)
-	if cap(s.currentKey) < l {
-		s.currentKey = make(key, l)
-	} else {
-		s.currentKey = s.currentKey[:l]
-	}
-	copy(s.currentKey, minKey)
+	s.currentKey = minKey
 	s.i = minIdx
 	return s.i >= 0
 }

@@ -1,6 +1,13 @@
 package execute
 
-import "github.com/influxdata/ifql/query"
+import (
+	"fmt"
+
+	"github.com/influxdata/ifql/interpreter"
+	"github.com/influxdata/ifql/query"
+	"github.com/influxdata/ifql/semantic"
+	"github.com/pkg/errors"
+)
 
 type aggregateTransformation struct {
 	d     Dataset
@@ -11,14 +18,53 @@ type aggregateTransformation struct {
 }
 
 type AggregateConfig struct {
-	UseStartTime bool `json:"useStartTime"`
+	Columns []string `json:"columns"`
+	TimeSrc string   `json:"time_src"`
+	TimeDst string   `json:"time_dst"`
+}
+
+var DefaultAggregateConfig = AggregateConfig{
+	Columns: []string{DefaultValueColLabel},
+	TimeSrc: DefaultStopColLabel,
+	TimeDst: DefaultTimeColLabel,
+}
+
+func (c AggregateConfig) Copy() AggregateConfig {
+	nc := c
+	if c.Columns != nil {
+		nc.Columns = make([]string, len(c.Columns))
+		copy(nc.Columns, c.Columns)
+	}
+	return nc
 }
 
 func (c *AggregateConfig) ReadArgs(args query.Arguments) error {
-	if useStartTime, ok, err := args.GetBool("useStartTime"); err != nil {
+	if label, ok, err := args.GetString("timeDst"); err != nil {
 		return err
 	} else if ok {
-		c.UseStartTime = useStartTime
+		c.TimeDst = label
+	} else {
+		c.TimeDst = DefaultAggregateConfig.TimeDst
+	}
+
+	if timeValue, ok, err := args.GetString("timeSrc"); err != nil {
+		return err
+	} else if ok {
+		c.TimeSrc = timeValue
+	} else {
+		c.TimeSrc = DefaultAggregateConfig.TimeSrc
+	}
+
+	if cols, ok, err := args.GetArray("columns", semantic.String); err != nil {
+		return err
+	} else if ok {
+		columns, err := interpreter.ToStringArray(cols)
+		if err != nil {
+			return err
+		}
+		c.Columns = columns
+	} else {
+		c.Columns = DefaultAggregateConfig.Columns
 	}
 	return nil
 }
@@ -38,113 +84,112 @@ func NewAggregateTransformationAndDataset(id DatasetID, mode AccumulationMode, a
 	return NewAggregateTransformation(d, cache, agg, config), d
 }
 
-func (t *aggregateTransformation) RetractBlock(id DatasetID, meta BlockMetadata) error {
+func (t *aggregateTransformation) RetractBlock(id DatasetID, key PartitionKey) error {
 	//TODO(nathanielc): Store intermediate state for retractions
-	key := ToBlockKey(meta)
 	return t.d.RetractBlock(key)
 }
 
 func (t *aggregateTransformation) Process(id DatasetID, b Block) error {
-	builder, new := t.cache.BlockBuilder(b)
-	if new {
-		cols := b.Cols()
-		for j, c := range cols {
-			switch c.Kind {
-			case TimeColKind:
-				builder.AddCol(c)
-			case TagColKind:
-				if c.Common {
-					builder.AddCol(c)
-					builder.SetCommonString(j, b.Tags()[c.Label])
-				}
-			case ValueColKind:
-				var vf ValueFunc
-				switch c.Type {
-				case TBool:
-					vf = t.agg.NewBoolAgg()
-				case TInt:
-					vf = t.agg.NewIntAgg()
-				case TUInt:
-					vf = t.agg.NewUIntAgg()
-				case TFloat:
-					vf = t.agg.NewFloatAgg()
-				case TString:
-					vf = t.agg.NewStringAgg()
-				}
-				builder.AddCol(ColMeta{
-					Label: c.Label,
-					Type:  vf.Type(),
-					Kind:  ValueColKind,
-				})
+	builder, new := t.cache.BlockBuilder(b.Key())
+	if !new {
+		return fmt.Errorf("aggregate found duplicate block with key: %v", b.Key())
+	}
+
+	AddBlockKeyCols(b.Key(), builder)
+	builder.AddCol(ColMeta{
+		Label: t.config.TimeDst,
+		Type:  TTime,
+	})
+
+	builderColMap := make([]int, len(t.config.Columns))
+	blockColMap := make([]int, len(t.config.Columns))
+	aggregates := make([]ValueFunc, len(t.config.Columns))
+
+	cols := b.Cols()
+	for j, label := range t.config.Columns {
+		idx := -1
+		for bj, bc := range cols {
+			if bc.Label == label {
+				idx = bj
+				break
 			}
 		}
-	}
-	// Add row for aggregate values
-	timeIdx := TimeIdx(builder.Cols())
-	if t.config.UseStartTime {
-		builder.AppendTime(timeIdx, b.Bounds().Start)
-	} else {
-		builder.AppendTime(timeIdx, b.Bounds().Stop)
-	}
-
-	for j, c := range b.Cols() {
-		if c.Kind != ValueColKind {
-			continue
+		if idx < 0 {
+			return fmt.Errorf("column %q does not exist", label)
 		}
-
-		// TODO(nathanielc): This reads the block multiple times (once per value column), is that OK?
-		values := b.Col(j)
+		c := cols[idx]
+		if b.Key().HasCol(c.Label) {
+			return errors.New("cannot aggregate columns that are part of the partition key")
+		}
 		var vf ValueFunc
 		switch c.Type {
 		case TBool:
-			f := t.agg.NewBoolAgg()
-			values.DoBool(func(vs []bool, _ RowReader) {
-				f.DoBool(vs)
-			})
-			vf = f
+			vf = t.agg.NewBoolAgg()
 		case TInt:
-			f := t.agg.NewIntAgg()
-			values.DoInt(func(vs []int64, _ RowReader) {
-				f.DoInt(vs)
-			})
-			vf = f
+			vf = t.agg.NewIntAgg()
 		case TUInt:
-			f := t.agg.NewUIntAgg()
-			values.DoUInt(func(vs []uint64, _ RowReader) {
-				f.DoUInt(vs)
-			})
-			vf = f
+			vf = t.agg.NewUIntAgg()
 		case TFloat:
-			f := t.agg.NewFloatAgg()
-			values.DoFloat(func(vs []float64, _ RowReader) {
-				f.DoFloat(vs)
-			})
-			vf = f
+			vf = t.agg.NewFloatAgg()
 		case TString:
-			f := t.agg.NewStringAgg()
-			values.DoString(func(vs []string, _ RowReader) {
-				f.DoString(vs)
-			})
-			vf = f
+			vf = t.agg.NewStringAgg()
+		default:
+			return fmt.Errorf("unsupported aggregate column type %v", c.Type)
 		}
+		aggregates[j] = vf
+		builderColMap[j] = builder.AddCol(ColMeta{
+			Label: c.Label,
+			Type:  vf.Type(),
+		})
+		blockColMap[j] = idx
+	}
+	if err := AppendAggregateTime(t.config.TimeSrc, t.config.TimeDst, b.Key(), builder); err != nil {
+		return err
+	}
+
+	b.Do(func(cr ColReader) error {
+		for j := range t.config.Columns {
+			vf := aggregates[j]
+
+			tj := blockColMap[j]
+			c := b.Cols()[tj]
+
+			switch c.Type {
+			case TBool:
+				vf.(DoBoolAgg).DoBool(cr.Bools(tj))
+			case TInt:
+				vf.(DoIntAgg).DoInt(cr.Ints(tj))
+			case TUInt:
+				vf.(DoUIntAgg).DoUInt(cr.UInts(tj))
+			case TFloat:
+				vf.(DoFloatAgg).DoFloat(cr.Floats(tj))
+			case TString:
+				vf.(DoStringAgg).DoString(cr.Strings(tj))
+			default:
+				return fmt.Errorf("unsupport aggregate type %v", c.Type)
+			}
+		}
+		return nil
+	})
+	for j, vf := range aggregates {
+		bj := builderColMap[j]
+		// Append aggregated value
 		switch vf.Type() {
 		case TBool:
-			v := vf.(BoolValueFunc)
-			builder.AppendBool(j, v.ValueBool())
+			builder.AppendBool(bj, vf.(BoolValueFunc).ValueBool())
 		case TInt:
-			v := vf.(IntValueFunc)
-			builder.AppendInt(j, v.ValueInt())
+			builder.AppendInt(bj, vf.(IntValueFunc).ValueInt())
 		case TUInt:
-			v := vf.(UIntValueFunc)
-			builder.AppendUInt(j, v.ValueUInt())
+			builder.AppendUInt(bj, vf.(UIntValueFunc).ValueUInt())
 		case TFloat:
-			v := vf.(FloatValueFunc)
-			builder.AppendFloat(j, v.ValueFloat())
+			builder.AppendFloat(bj, vf.(FloatValueFunc).ValueFloat())
 		case TString:
-			v := vf.(StringValueFunc)
-			builder.AppendString(j, v.ValueString())
+			builder.AppendString(bj, vf.(StringValueFunc).ValueString())
 		}
 	}
+
+	AppendKeyValues(b.Key(), builder)
+
 	return nil
 }
 
@@ -156,6 +201,29 @@ func (t *aggregateTransformation) UpdateProcessingTime(id DatasetID, pt Time) er
 }
 func (t *aggregateTransformation) Finish(id DatasetID, err error) {
 	t.d.Finish(err)
+}
+
+func AppendAggregateTime(srcTime, dstTime string, key PartitionKey, builder BlockBuilder) error {
+	srcTimeIdx := ColIdx(srcTime, key.Cols())
+	if srcTimeIdx < 0 {
+		return fmt.Errorf("timeValue column %q does not exist", srcTime)
+	}
+	srcTimeCol := key.Cols()[srcTimeIdx]
+	if srcTimeCol.Type != TTime {
+		return fmt.Errorf("timeValue column %q does not have type time", srcTime)
+	}
+
+	dstTimeIdx := ColIdx(dstTime, builder.Cols())
+	if dstTimeIdx < 0 {
+		return fmt.Errorf("timeValue column %q does not exist", dstTime)
+	}
+	dstTimeCol := builder.Cols()[dstTimeIdx]
+	if dstTimeCol.Type != TTime {
+		return fmt.Errorf("timeValue column %q does not have type time", dstTime)
+	}
+
+	builder.AppendTime(dstTimeIdx, key.ValueTime(srcTimeIdx))
+	return nil
 }
 
 type Aggregate interface {

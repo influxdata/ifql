@@ -9,7 +9,7 @@ import (
 type Dataset interface {
 	Node
 
-	RetractBlock(key BlockKey) error
+	RetractBlock(key PartitionKey) error
 	UpdateProcessingTime(t Time) error
 	UpdateWatermark(mark Time) error
 	Finish(error)
@@ -19,14 +19,13 @@ type Dataset interface {
 
 // DataCache holds all working data for a transformation.
 type DataCache interface {
-	BlockMetadata(BlockKey) BlockMetadata
-	Block(BlockKey) (Block, error)
+	Block(PartitionKey) (Block, error)
 
-	ForEach(func(BlockKey))
-	ForEachWithContext(func(BlockKey, Trigger, BlockContext))
+	ForEach(func(PartitionKey))
+	ForEachWithContext(func(PartitionKey, Trigger, BlockContext))
 
-	DiscardBlock(BlockKey)
-	ExpireBlock(BlockKey)
+	DiscardBlock(PartitionKey)
+	ExpireBlock(PartitionKey)
 
 	SetTriggerSpec(t query.TriggerSpec)
 }
@@ -106,7 +105,7 @@ func (d *dataset) UpdateProcessingTime(time Time) error {
 }
 
 func (d *dataset) evalTriggers() (err error) {
-	d.cache.ForEachWithContext(func(bk BlockKey, trigger Trigger, bc BlockContext) {
+	d.cache.ForEachWithContext(func(key PartitionKey, trigger Trigger, bc BlockContext) {
 		if err != nil {
 			// Skip the rest once we have encountered an error
 			return
@@ -118,16 +117,16 @@ func (d *dataset) evalTriggers() (err error) {
 		}
 
 		if trigger.Triggered(c) {
-			err = d.triggerBlock(bk)
+			err = d.triggerBlock(key)
 		}
 		if trigger.Finished() {
-			d.expireBlock(bk)
+			d.expireBlock(key)
 		}
 	})
 	return err
 }
 
-func (d *dataset) triggerBlock(key BlockKey) error {
+func (d *dataset) triggerBlock(key PartitionKey) error {
 	b, err := d.cache.Block(key)
 	if err != nil {
 		return err
@@ -143,7 +142,7 @@ func (d *dataset) triggerBlock(key BlockKey) error {
 		d.cache.DiscardBlock(key)
 	case AccumulatingRetractingMode:
 		for _, t := range d.ts {
-			if err := t.RetractBlock(d.id, b); err != nil {
+			if err := t.RetractBlock(d.id, b.Key()); err != nil {
 				return err
 			}
 		}
@@ -158,14 +157,14 @@ func (d *dataset) triggerBlock(key BlockKey) error {
 	return nil
 }
 
-func (d *dataset) expireBlock(key BlockKey) {
+func (d *dataset) expireBlock(key PartitionKey) {
 	d.cache.ExpireBlock(key)
 }
 
-func (d *dataset) RetractBlock(key BlockKey) error {
+func (d *dataset) RetractBlock(key PartitionKey) error {
 	d.cache.DiscardBlock(key)
 	for _, t := range d.ts {
-		if err := t.RetractBlock(d.id, d.cache.BlockMetadata(key)); err != nil {
+		if err := t.RetractBlock(d.id, key); err != nil {
 			return err
 		}
 	}
@@ -175,7 +174,7 @@ func (d *dataset) RetractBlock(key BlockKey) error {
 func (d *dataset) Finish(err error) {
 	if err == nil {
 		// Only trigger blocks we if we not finishing because of an error.
-		d.cache.ForEach(func(bk BlockKey) {
+		d.cache.ForEach(func(bk PartitionKey) {
 			if err != nil {
 				return
 			}

@@ -14,6 +14,7 @@ const IntegralKind = "integral"
 
 type IntegralOpSpec struct {
 	Unit query.Duration `json:"unit"`
+	execute.AggregateConfig
 }
 
 var integralSignature = query.DefaultFunctionSignature()
@@ -43,6 +44,9 @@ func createIntegralOpSpec(args query.Arguments, a *query.Administration) (query.
 		spec.Unit = query.Duration(time.Second)
 	}
 
+	if err := spec.AggregateConfig.ReadArgs(args); err != nil {
+		return nil, err
+	}
 	return spec, nil
 }
 
@@ -56,6 +60,7 @@ func (s *IntegralOpSpec) Kind() query.OperationKind {
 
 type IntegralProcedureSpec struct {
 	Unit query.Duration `json:"unit"`
+	execute.AggregateConfig
 }
 
 func newIntegralProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -65,7 +70,8 @@ func newIntegralProcedure(qs query.OperationSpec, pa plan.Administration) (plan.
 	}
 
 	return &IntegralProcedureSpec{
-		Unit: spec.Unit,
+		Unit:            spec.Unit,
+		AggregateConfig: spec.AggregateConfig,
 	}, nil
 }
 
@@ -75,6 +81,9 @@ func (s *IntegralProcedureSpec) Kind() plan.ProcedureKind {
 func (s *IntegralProcedureSpec) Copy() plan.ProcedureSpec {
 	ns := new(IntegralProcedureSpec)
 	*ns = *s
+
+	ns.AggregateConfig = s.AggregateConfig.Copy()
+
 	return ns
 }
 
@@ -85,83 +94,84 @@ func createIntegralTransformation(id execute.DatasetID, mode execute.Accumulatio
 	}
 	cache := execute.NewBlockBuilderCache(a.Allocator())
 	d := execute.NewDataset(id, mode, cache)
-	t := NewIntegralTransformation(d, cache, s, a.Bounds())
+	t := NewIntegralTransformation(d, cache, s)
 	return t, d, nil
 }
 
 type integralTransformation struct {
-	d      execute.Dataset
-	cache  execute.BlockBuilderCache
-	bounds execute.Bounds
+	d     execute.Dataset
+	cache execute.BlockBuilderCache
 
-	unit time.Duration
+	spec IntegralProcedureSpec
 }
 
-func NewIntegralTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *IntegralProcedureSpec, bounds execute.Bounds) *integralTransformation {
+func NewIntegralTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *IntegralProcedureSpec) *integralTransformation {
 	return &integralTransformation{
-		d:      d,
-		cache:  cache,
-		bounds: bounds,
-		unit:   time.Duration(spec.Unit),
+		d:     d,
+		cache: cache,
+		spec:  *spec,
 	}
 }
 
-func (t *integralTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	return t.d.RetractBlock(execute.ToBlockKey(meta))
+func (t *integralTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
+	return t.d.RetractBlock(key)
 }
 
 func (t *integralTransformation) Process(id execute.DatasetID, b execute.Block) error {
-	builder, new := t.cache.BlockBuilder(blockMetadata{
-		bounds: t.bounds,
-		tags:   b.Tags(),
-	})
-	if new {
-		cols := b.Cols()
-		for j, c := range cols {
-			switch c.Kind {
-			case execute.TimeColKind:
-				builder.AddCol(c)
-			case execute.TagColKind:
-				if c.Common {
-					builder.AddCol(c)
-					builder.SetCommonString(j, b.Tags()[c.Label])
-				}
-			case execute.ValueColKind:
-				dc := c
-				// Integral always results in a float64
-				dc.Type = execute.TFloat
-				builder.AddCol(dc)
-			}
-		}
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("integral found duplicate block with key: %v", b.Key())
 	}
+
+	execute.AddBlockKeyCols(b.Key(), builder)
+	builder.AddCol(execute.ColMeta{
+		Label: t.spec.TimeDst,
+		Type:  execute.TTime,
+	})
 	cols := b.Cols()
 	integrals := make([]*integral, len(cols))
+	colMap := make([]int, len(cols))
 	for j, c := range cols {
-		if c.IsValue() {
-			in := newIntegral(t.unit)
-			integrals[j] = in
+		if execute.ContainsStr(t.spec.Columns, c.Label) {
+			integrals[j] = newIntegral(time.Duration(t.spec.Unit))
+			colMap[j] = builder.AddCol(execute.ColMeta{
+				Label: c.Label,
+				Type:  execute.TFloat,
+			})
 		}
 	}
 
-	b.Times().DoTime(func(ts []execute.Time, rr execute.RowReader) {
+	if err := execute.AppendAggregateTime(t.spec.TimeSrc, t.spec.TimeDst, b.Key(), builder); err != nil {
+		return err
+	}
+
+	timeIdx := execute.ColIdx(t.spec.TimeDst, cols)
+	if timeIdx < 0 {
+		return fmt.Errorf("no column %q exists", t.spec.TimeSrc)
+	}
+	err := b.Do(func(cr execute.ColReader) error {
 		for j, in := range integrals {
 			if in == nil {
 				continue
 			}
-			for i, t := range ts {
-				in.updateFloat(t, rr.AtFloat(i, j))
+			l := cr.Len()
+			for i := 0; i < l; i++ {
+				tm := cr.Times(timeIdx)[i]
+				in.updateFloat(tm, cr.Floats(j)[i])
 			}
 		}
+		return nil
 	})
+	if err != nil {
+		return err
+	}
 
-	timeIdx := execute.TimeIdx(cols)
-	builder.AppendTime(timeIdx, b.Bounds().Stop)
-
+	execute.AppendKeyValues(b.Key(), builder)
 	for j, in := range integrals {
 		if in == nil {
 			continue
 		}
-		builder.AppendFloat(j, in.value())
+		builder.AppendFloat(colMap[j], in.value())
 	}
 
 	return nil

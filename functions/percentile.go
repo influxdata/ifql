@@ -162,10 +162,13 @@ func createPercentileTransformation(id execute.DatasetID, mode execute.Accumulat
 	t, d := execute.NewAggregateTransformationAndDataset(id, mode, agg, ps.AggregateConfig, a.Allocator())
 	return t, d, nil
 }
-
-func (a *PercentileAgg) reset() {
-	a.digest = tdigest.NewWithCompression(a.Compression)
+func (a *PercentileAgg) Copy() *PercentileAgg {
+	na := new(PercentileAgg)
+	*na = *a
+	na.digest = tdigest.NewWithCompression(na.Compression)
+	return na
 }
+
 func (a *PercentileAgg) NewBoolAgg() execute.DoBoolAgg {
 	return nil
 }
@@ -179,8 +182,7 @@ func (a *PercentileAgg) NewUIntAgg() execute.DoUIntAgg {
 }
 
 func (a *PercentileAgg) NewFloatAgg() execute.DoFloatAgg {
-	a.reset()
-	return a
+	return a.Copy()
 }
 
 func (a *PercentileAgg) NewStringAgg() execute.DoStringAgg {
@@ -218,8 +220,11 @@ func createExactPercentileTransformation(id execute.DatasetID, mode execute.Accu
 	return t, d, nil
 }
 
-func (a *ExactPercentileAgg) reset() {
-	a.data = a.data[0:0]
+func (a *ExactPercentileAgg) Copy() *ExactPercentileAgg {
+	na := new(ExactPercentileAgg)
+	*na = *a
+	na.data = nil
+	return na
 }
 func (a *ExactPercentileAgg) NewBoolAgg() execute.DoBoolAgg {
 	return nil
@@ -234,8 +239,7 @@ func (a *ExactPercentileAgg) NewUIntAgg() execute.DoUIntAgg {
 }
 
 func (a *ExactPercentileAgg) NewFloatAgg() execute.DoFloatAgg {
-	a.reset()
-	return a
+	return a.Copy()
 }
 
 func (a *ExactPercentileAgg) NewStringAgg() execute.DoStringAgg {

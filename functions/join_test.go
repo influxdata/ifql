@@ -273,25 +273,166 @@ func TestJoinOperation_Marshaling(t *testing.T) {
 func TestMergeJoin_Process(t *testing.T) {
 	addFunction := &semantic.FunctionExpression{
 		Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "t"}}},
-		Body: &semantic.BinaryExpression{
-			Operator: ast.AdditionOperator,
-			Left: &semantic.MemberExpression{
-				Object: &semantic.MemberExpression{
-					Object: &semantic.IdentifierExpression{
-						Name: "t",
+		Body: &semantic.ObjectExpression{
+			Properties: []*semantic.Property{
+				{
+					Key: &semantic.Identifier{Name: "_time"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "_time",
 					},
-					Property: "a",
 				},
-				Property: "_value",
+				{
+					Key: &semantic.Identifier{Name: "_value"},
+					Value: &semantic.BinaryExpression{
+						Operator: ast.AdditionOperator,
+						Left: &semantic.MemberExpression{
+							Object: &semantic.MemberExpression{
+								Object: &semantic.IdentifierExpression{
+									Name: "t",
+								},
+								Property: "a",
+							},
+							Property: "_value",
+						},
+						Right: &semantic.MemberExpression{
+							Object: &semantic.MemberExpression{
+								Object: &semantic.IdentifierExpression{
+									Name: "t",
+								},
+								Property: "b",
+							},
+							Property: "_value",
+						},
+					},
+				},
 			},
-			Right: &semantic.MemberExpression{
-				Object: &semantic.MemberExpression{
-					Object: &semantic.IdentifierExpression{
-						Name: "t",
+		},
+	}
+	addFunctionT1 := &semantic.FunctionExpression{
+		Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "t"}}},
+		Body: &semantic.ObjectExpression{
+			Properties: []*semantic.Property{
+				{
+					Key: &semantic.Identifier{Name: "_time"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "_time",
 					},
-					Property: "b",
 				},
-				Property: "_value",
+				{
+					Key: &semantic.Identifier{Name: "t1"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "t1",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "_value"},
+					Value: &semantic.BinaryExpression{
+						Operator: ast.AdditionOperator,
+						Left: &semantic.MemberExpression{
+							Object: &semantic.MemberExpression{
+								Object: &semantic.IdentifierExpression{
+									Name: "t",
+								},
+								Property: "a",
+							},
+							Property: "_value",
+						},
+						Right: &semantic.MemberExpression{
+							Object: &semantic.MemberExpression{
+								Object: &semantic.IdentifierExpression{
+									Name: "t",
+								},
+								Property: "b",
+							},
+							Property: "_value",
+						},
+					},
+				},
+			},
+		},
+	}
+	addFunctionT1T2 := &semantic.FunctionExpression{
+		Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "t"}}},
+		Body: &semantic.ObjectExpression{
+			Properties: []*semantic.Property{
+				{
+					Key: &semantic.Identifier{Name: "_time"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "_time",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "t1"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "t1",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "t2"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "t2",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "_value"},
+					Value: &semantic.BinaryExpression{
+						Operator: ast.AdditionOperator,
+						Left: &semantic.MemberExpression{
+							Object: &semantic.MemberExpression{
+								Object: &semantic.IdentifierExpression{
+									Name: "t",
+								},
+								Property: "a",
+							},
+							Property: "_value",
+						},
+						Right: &semantic.MemberExpression{
+							Object: &semantic.MemberExpression{
+								Object: &semantic.IdentifierExpression{
+									Name: "t",
+								},
+								Property: "b",
+							},
+							Property: "_value",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -299,6 +440,85 @@ func TestMergeJoin_Process(t *testing.T) {
 		Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "t"}}},
 		Body: &semantic.ObjectExpression{
 			Properties: []*semantic.Property{
+				{
+					Key: &semantic.Identifier{Name: "_time"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "_time",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "a"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "_value",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "b"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "b",
+						},
+						Property: "_value",
+					},
+				},
+			},
+		},
+	}
+	passThroughFuncT1T2 := &semantic.FunctionExpression{
+		Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "t"}}},
+		Body: &semantic.ObjectExpression{
+			Properties: []*semantic.Property{
+				{
+					Key: &semantic.Identifier{Name: "_time"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "_time",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "t1"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "t1",
+					},
+				},
+				{
+					Key: &semantic.Identifier{Name: "t2"},
+					Value: &semantic.MemberExpression{
+						Object: &semantic.MemberExpression{
+							Object: &semantic.IdentifierExpression{
+								Name: "t",
+							},
+							Property: "a",
+						},
+						Property: "t2",
+					},
+				},
 				{
 					Key: &semantic.Identifier{Name: "a"},
 					Value: &semantic.MemberExpression{
@@ -343,18 +563,15 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "simple inner",
 			spec: &functions.MergeJoinProcedureSpec{
+				On:         []string{"_time"},
 				Fn:         addFunction,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0},
@@ -365,13 +582,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0},
@@ -382,13 +595,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 11.0},
@@ -401,18 +610,15 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "simple inner with ints",
 			spec: &functions.MergeJoinProcedureSpec{
+				On:         []string{"_time"},
 				Fn:         addFunction,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TInt, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TInt},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), int64(1)},
@@ -423,13 +629,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TInt, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TInt},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), int64(10)},
@@ -440,13 +642,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TInt, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TInt},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), int64(11)},
@@ -459,18 +657,15 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "inner with missing values",
 			spec: &functions.MergeJoinProcedureSpec{
+				On:         []string{"_time"},
 				Fn:         addFunction,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0},
@@ -481,13 +676,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0},
@@ -497,13 +688,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 11.0},
@@ -515,18 +702,15 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "inner with multiple matches",
 			spec: &functions.MergeJoinProcedureSpec{
+				On:         []string{"_time"},
 				Fn:         addFunction,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0},
@@ -537,13 +721,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0},
@@ -556,13 +736,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 11.0},
@@ -577,20 +753,17 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "inner with common tags",
 			spec: &functions.MergeJoinProcedureSpec{
-				On:         []string{"t1"},
-				Fn:         addFunction,
+				On:         []string{"_time", "t1"},
+				Fn:         addFunctionT1,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "a"},
@@ -601,14 +774,11 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0, "a"},
@@ -619,14 +789,11 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 11.0, "a"},
@@ -639,20 +806,16 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "inner with extra attributes",
 			spec: &functions.MergeJoinProcedureSpec{
-				On:         []string{"t1"},
-				Fn:         addFunction,
+				On:         []string{"_time", "t1"},
+				Fn:         addFunctionT1,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "a"},
@@ -666,14 +829,10 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0, "a"},
@@ -687,14 +846,10 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 11.0, "a"},
@@ -710,21 +865,18 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "inner with tags and extra attributes",
 			spec: &functions.MergeJoinProcedureSpec{
-				On:         []string{"t1", "t2"},
-				Fn:         addFunction,
+				On:         []string{"_time", "t1", "t2"},
+				Fn:         addFunctionT1T2,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
+						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "a", "x"},
@@ -738,15 +890,12 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
+						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0, "a", "x"},
@@ -760,15 +909,12 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
+						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 11.0, "a", "x"},
@@ -784,18 +930,15 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "simple inner with multiple values",
 			spec: &functions.MergeJoinProcedureSpec{
+				On:         []string{"_time"},
 				Fn:         passThroughFunc,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0},
@@ -806,13 +949,9 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0},
@@ -823,14 +962,10 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "a", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "b", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "a", Type: execute.TFloat},
+						{Label: "b", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, 10.0},
@@ -843,21 +978,18 @@ func TestMergeJoin_Process(t *testing.T) {
 		{
 			name: "inner with multiple value, tags and extra attributes",
 			spec: &functions.MergeJoinProcedureSpec{
-				On:         []string{"t1", "t2"},
-				Fn:         passThroughFunc,
+				On:         []string{"_time", "t1", "t2"},
+				Fn:         passThroughFuncT1T2,
 				TableNames: tableNames,
 			},
 			data0: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
+						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "a", "x"},
@@ -871,15 +1003,12 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			data1: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
+						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 10.0, "a", "x"},
@@ -893,16 +1022,13 @@ func TestMergeJoin_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 0,
-						Stop:  10,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "a", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "b", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "a", Type: execute.TFloat},
+						{Label: "b", Type: execute.TFloat},
+						{Label: "t1", Type: execute.TString},
+						{Label: "t2", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, 10.0, "a", "x"},
@@ -934,7 +1060,7 @@ func TestMergeJoin_Process(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			c := functions.NewMergeJoinCache(joinExpr, executetest.UnlimitedAllocator, tableNames[parents[0]], tableNames[parents[1]])
+			c := functions.NewMergeJoinCache(joinExpr, executetest.UnlimitedAllocator, tableNames[parents[0]], tableNames[parents[1]], tc.spec.On)
 			c.SetTriggerSpec(execute.DefaultTriggerSpec)
 			jt := functions.NewMergeJoinTransformation(d, c, tc.spec, parents, tableNames)
 

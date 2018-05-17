@@ -28,7 +28,6 @@ func TestIntegral_PassThrough(t *testing.T) {
 			d,
 			c,
 			&functions.IntegralProcedureSpec{},
-			execute.Bounds{},
 		)
 		return s
 	})
@@ -36,121 +35,105 @@ func TestIntegral_PassThrough(t *testing.T) {
 
 func TestIntegral_Process(t *testing.T) {
 	testCases := []struct {
-		name   string
-		spec   *functions.IntegralProcedureSpec
-		bounds execute.Bounds
-		data   []execute.Block
-		want   []*executetest.Block
+		name string
+		spec *functions.IntegralProcedureSpec
+		data []execute.Block
+		want []*executetest.Block
 	}{
 		{
 			name: "float",
 			spec: &functions.IntegralProcedureSpec{
-				Unit: 1,
-			},
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  3,
+				Unit:            1,
+				AggregateConfig: execute.DefaultAggregateConfig,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(1), 2.0},
-					{execute.Time(2), 1.0},
+					{execute.Time(1), execute.Time(3), execute.Time(1), 2.0},
+					{execute.Time(1), execute.Time(3), execute.Time(2), 1.0},
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(3), 1.5},
+					{execute.Time(1), execute.Time(3), execute.Time(3), 1.5},
 				},
 			}},
 		},
 		{
 			name: "float with units",
 			spec: &functions.IntegralProcedureSpec{
-				Unit: query.Duration(time.Second),
-			},
-			bounds: execute.Bounds{
-				Start: execute.Time(1 * time.Second),
-				Stop:  execute.Time(4 * time.Second),
+				Unit:            query.Duration(time.Second),
+				AggregateConfig: execute.DefaultAggregateConfig,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: execute.Time(1 * time.Second),
-					Stop:  execute.Time(4 * time.Second),
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(1 * time.Second), 2.0},
-					{execute.Time(3 * time.Second), 1.0},
+					{execute.Time(1 * time.Second), execute.Time(4 * time.Second), execute.Time(1 * time.Second), 2.0},
+					{execute.Time(1 * time.Second), execute.Time(4 * time.Second), execute.Time(3 * time.Second), 1.0},
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: execute.Time(1 * time.Second),
-					Stop:  execute.Time(4 * time.Second),
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(4 * time.Second), 3.0},
+					{execute.Time(1 * time.Second), execute.Time(4 * time.Second), execute.Time(4 * time.Second), 3.0},
 				},
 			}},
 		},
 		{
 			name: "float with tags",
 			spec: &functions.IntegralProcedureSpec{
-				Unit: 1,
-			},
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  3,
+				Unit:            1,
+				AggregateConfig: execute.DefaultAggregateConfig,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t", Type: execute.TString, Kind: execute.TagColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t", Type: execute.TString},
 				},
 				Data: [][]interface{}{
-					{execute.Time(1), 2.0, "a"},
-					{execute.Time(2), 1.0, "b"},
+					{execute.Time(1), execute.Time(3), execute.Time(1), 2.0, "a"},
+					{execute.Time(1), execute.Time(3), execute.Time(2), 1.0, "b"},
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(3), 1.5},
+					{execute.Time(1), execute.Time(3), execute.Time(3), 1.5},
 				},
 			}},
 		},
@@ -158,40 +141,39 @@ func TestIntegral_Process(t *testing.T) {
 			name: "float with multiple values",
 			spec: &functions.IntegralProcedureSpec{
 				Unit: 1,
-			},
-			bounds: execute.Bounds{
-				Start: 1,
-				Stop:  5,
+				AggregateConfig: execute.AggregateConfig{
+					TimeDst: execute.DefaultTimeColLabel,
+					TimeSrc: execute.DefaultStopColLabel,
+					Columns: []string{"x", "y"},
+				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "x", Type: execute.TFloat},
+					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(1), 2.0, 20.0},
-					{execute.Time(2), 1.0, 10.0},
-					{execute.Time(3), 2.0, 20.0},
-					{execute.Time(4), 1.0, 10.0},
+					{execute.Time(1), execute.Time(5), execute.Time(1), 2.0, 20.0},
+					{execute.Time(1), execute.Time(5), execute.Time(2), 1.0, 10.0},
+					{execute.Time(1), execute.Time(5), execute.Time(3), 2.0, 20.0},
+					{execute.Time(1), execute.Time(5), execute.Time(4), 1.0, 10.0},
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
+				KeyCols: []string{"_start", "_stop"},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "x", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "y", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_start", Type: execute.TTime},
+					{Label: "_stop", Type: execute.TTime},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "x", Type: execute.TFloat},
+					{Label: "y", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
-					{execute.Time(5), 4.5, 45.0},
+					{execute.Time(1), execute.Time(5), execute.Time(5), 4.5, 45.0},
 				},
 			}},
 		},
@@ -204,7 +186,7 @@ func TestIntegral_Process(t *testing.T) {
 				tc.data,
 				tc.want,
 				func(d execute.Dataset, c execute.BlockBuilderCache) execute.Transformation {
-					return functions.NewIntegralTransformation(d, c, tc.spec, tc.bounds)
+					return functions.NewIntegralTransformation(d, c, tc.spec)
 				},
 			)
 		})

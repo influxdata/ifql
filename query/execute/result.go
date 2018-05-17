@@ -35,7 +35,7 @@ func newResult(plan.YieldSpec) *result {
 	}
 }
 
-func (s *result) RetractBlock(DatasetID, BlockMetadata) error {
+func (s *result) RetractBlock(DatasetID, PartitionKey) error {
 	//TODO implement
 	return nil
 }

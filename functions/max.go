@@ -125,14 +125,14 @@ func (s *MaxSelector) Rows() []execute.Row {
 	return s.rows
 }
 
-func (s *MaxSelector) selectRow(idx int, rr execute.RowReader) {
+func (s *MaxSelector) selectRow(idx int, cr execute.ColReader) {
 	// Capture row
 	if idx >= 0 {
-		s.rows = []execute.Row{execute.ReadRow(idx, rr)}
+		s.rows = []execute.Row{execute.ReadRow(idx, cr)}
 	}
 }
 
-func (s *MaxIntSelector) DoInt(vs []int64, rr execute.RowReader) {
+func (s *MaxIntSelector) DoInt(vs []int64, cr execute.ColReader) {
 	maxIdx := -1
 	for i, v := range vs {
 		if !s.set || v > s.max {
@@ -141,9 +141,9 @@ func (s *MaxIntSelector) DoInt(vs []int64, rr execute.RowReader) {
 			maxIdx = i
 		}
 	}
-	s.selectRow(maxIdx, rr)
+	s.selectRow(maxIdx, cr)
 }
-func (s *MaxUIntSelector) DoUInt(vs []uint64, rr execute.RowReader) {
+func (s *MaxUIntSelector) DoUInt(vs []uint64, cr execute.ColReader) {
 	maxIdx := -1
 	for i, v := range vs {
 		if !s.set || v > s.max {
@@ -152,9 +152,9 @@ func (s *MaxUIntSelector) DoUInt(vs []uint64, rr execute.RowReader) {
 			maxIdx = i
 		}
 	}
-	s.selectRow(maxIdx, rr)
+	s.selectRow(maxIdx, cr)
 }
-func (s *MaxFloatSelector) DoFloat(vs []float64, rr execute.RowReader) {
+func (s *MaxFloatSelector) DoFloat(vs []float64, cr execute.ColReader) {
 	maxIdx := -1
 	for i, v := range vs {
 		if !s.set || v > s.max {
@@ -163,5 +163,5 @@ func (s *MaxFloatSelector) DoFloat(vs []float64, rr execute.RowReader) {
 			maxIdx = i
 		}
 	}
-	s.selectRow(maxIdx, rr)
+	s.selectRow(maxIdx, cr)
 }

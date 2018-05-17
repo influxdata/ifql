@@ -82,8 +82,9 @@ func (e *executor) createExecutionState(ctx context.Context, orgID id.ID, p *pla
 			Stop:  Time(p.Bounds.Stop.Time(p.Now).UnixNano()),
 		},
 	}
+	nodes := make(map[plan.ProcedureID]Node, len(p.Procedures))
 	for name, yield := range p.Results {
-		ds, err := es.createNode(ctx, p.Procedures[yield.ID])
+		ds, err := es.createNode(ctx, p.Procedures[yield.ID], nodes)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +103,11 @@ type triggeringSpec interface {
 	TriggerSpec() query.TriggerSpec
 }
 
-func (es *executionState) createNode(ctx context.Context, pr *plan.Procedure) (Node, error) {
+func (es *executionState) createNode(ctx context.Context, pr *plan.Procedure, nodes map[plan.ProcedureID]Node) (Node, error) {
+	// Check if we already created this node
+	if n, ok := nodes[pr.ID]; ok {
+		return n, nil
+	}
 	// Build execution context
 	ec := executionContext{
 		es: es,
@@ -121,6 +126,7 @@ func (es *executionState) createNode(ctx context.Context, pr *plan.Procedure) (N
 			return nil, err
 		}
 		es.sources = append(es.sources, s)
+		nodes[pr.ID] = s
 		return s, nil
 	}
 
@@ -134,6 +140,7 @@ func (es *executionState) createNode(ctx context.Context, pr *plan.Procedure) (N
 	if err != nil {
 		return nil, err
 	}
+	nodes[pr.ID] = ds
 
 	// Setup triggering
 	var ts query.TriggerSpec = DefaultTriggerSpec
@@ -144,7 +151,7 @@ func (es *executionState) createNode(ctx context.Context, pr *plan.Procedure) (N
 
 	// Recurse creating parents
 	for _, parentID := range pr.Parents {
-		parent, err := es.createNode(ctx, es.p.Procedures[parentID])
+		parent, err := es.createNode(ctx, es.p.Procedures[parentID], nodes)
 		if err != nil {
 			return nil, err
 		}

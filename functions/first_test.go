@@ -13,12 +13,12 @@ import (
 )
 
 func TestFirstOperation_Marshaling(t *testing.T) {
-	data := []byte(`{"id":"first","kind":"first","spec":{"useRowTime":true}}`)
+	data := []byte(`{"id":"first","kind":"first","spec":{"column":"foo"}}`)
 	op := &query.Operation{
 		ID: "first",
 		Spec: &functions.FirstOpSpec{
 			SelectorConfig: execute.SelectorConfig{
-				UseRowTime: true,
+				Column: "foo",
 			},
 		},
 	}
@@ -36,10 +36,10 @@ func TestFirst_Process(t *testing.T) {
 			name: "first",
 			data: &executetest.Block{
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString},
+					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 0.0, "a", "y"},

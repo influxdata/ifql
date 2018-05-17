@@ -39,15 +39,13 @@ func TestCumulativeSum_Process(t *testing.T) {
 	}{
 		{
 			name: "float",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{execute.DefaultValueColLabel},
+			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 2.0},
@@ -63,13 +61,9 @@ func TestCumulativeSum_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), 2.0},
@@ -87,17 +81,15 @@ func TestCumulativeSum_Process(t *testing.T) {
 		},
 		{
 			name: "multiple value columns",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{"int", "uint", "float"},
+			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "int", Type: execute.TInt, Kind: execute.ValueColKind},
-					{Label: "uint", Type: execute.TUInt, Kind: execute.ValueColKind},
-					{Label: "float", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "int", Type: execute.TInt},
+					{Label: "uint", Type: execute.TUInt},
+					{Label: "float", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), int64(2), uint64(1), 1.0},
@@ -113,15 +105,11 @@ func TestCumulativeSum_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "int", Type: execute.TInt, Kind: execute.ValueColKind},
-					{Label: "uint", Type: execute.TUInt, Kind: execute.ValueColKind},
-					{Label: "float", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "int", Type: execute.TInt},
+					{Label: "uint", Type: execute.TUInt},
+					{Label: "float", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), int64(2), uint64(1), 1.0},
@@ -139,17 +127,15 @@ func TestCumulativeSum_Process(t *testing.T) {
 		},
 		{
 			name: "multiple time columns",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{"int", "float"},
+			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "time2", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "int", Type: execute.TInt, Kind: execute.ValueColKind},
-					{Label: "float", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "time2", Type: execute.TTime},
+					{Label: "int", Type: execute.TInt},
+					{Label: "float", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), execute.Time(0), int64(2), 1.0},
@@ -165,15 +151,11 @@ func TestCumulativeSum_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "time2", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "int", Type: execute.TInt, Kind: execute.ValueColKind},
-					{Label: "float", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "time2", Type: execute.TTime},
+					{Label: "int", Type: execute.TInt},
+					{Label: "float", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), execute.Time(0), int64(2), 1.0},
@@ -191,16 +173,14 @@ func TestCumulativeSum_Process(t *testing.T) {
 		},
 		{
 			name: "tag columns",
-			spec: &functions.CumulativeSumProcedureSpec{},
+			spec: &functions.CumulativeSumProcedureSpec{
+				Columns: []string{"int"},
+			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "int", Type: execute.TInt, Kind: execute.ValueColKind},
-					{Label: "t", Type: execute.TString, Kind: execute.TagColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "int", Type: execute.TInt},
+					{Label: "t", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), int64(2), "tag0"},
@@ -216,14 +196,10 @@ func TestCumulativeSum_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 0,
-					Stop:  10,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "int", Type: execute.TInt, Kind: execute.ValueColKind},
-					{Label: "t", Type: execute.TString, Kind: execute.TagColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "int", Type: execute.TInt},
+					{Label: "t", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(0), int64(2), "tag0"},

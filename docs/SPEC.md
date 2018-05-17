@@ -705,18 +705,31 @@ Operations that modify the partition keys or values will need to repartition the
 
 From produces a stream of tables from the specified bucket.
 Each unique series is contained within its own table.
-The tables schema will include a `_time` column, columns for each tag on the series and a `_value` column for the value of the series.
 Each record in the table represents a single point in the series.
 
+The tables schema will include the following columns:
+
+* `_time`
+    the time of the record
+* `_value`
+    the value of the record
+* `_start`
+    the inclusive lower time bound of all records
+* `_stop`
+    the exclusive upper time bound of all records
+
+Additionally any tags on the series will be added as columns.
 
 Example:
 
     from(bucket:"telegraf")
 
-The from operation has the following properties:
+From has the following properties:
 
 * `bucket` string
     The name of the bucket to query.
+* `db` string
+    The name of the database to query.
 
 #### Yield
 
@@ -724,6 +737,11 @@ Yield indicates that the stream received by the yield operation should be delive
 A query may have multiple results, each identified by the name provided to yield.
 
 Yield outputs the input stream unmodified.
+
+Yield has the following properties:
+
+* `name` string
+    unique name to give to yielded results
 
 #### Aggregate operations
 
@@ -746,16 +764,46 @@ All aggregate operations have the following properties:
 
 * `columns` list of string
     columns specifies a list of columns to aggregate.
-* `timeValue` string
-    timeValue specifies which time value to use on the resulting aggregate record.
-    The value must be one of `_start`, or `_stop`.
+* `timeSrc` string
+    timeSrc is the source time column to use on the resulting aggregate record.
+    The value must be column with type `time` and must be part of the partition key.
+    Defaults to `_stop`.
+* `timeDst` string
+    timeDst is the destination column to use for the resulting aggregate record.
+    Defaults to `_time`.
 
 [IMPL#294](https://github.com/influxdata/ifql/issues/294) Remove concept of Kind from table columns
+
+##### Covariance
+
+Covariance is an aggregate operation.
+Covariance computes the covariance between two columns.
+
+Covariance has the following properties:
+
+* `pearsonr` bool
+    pearsonr indicates whether the result should be normalized to be the Pearson R coefficient.
+* `valueDst` string
+    valueDst is the column into which the result will be placed.
+    Defaults to `_value`.
+
+Additionally exactly two columns must be provided to the `columns` property.
 
 ##### Count
 
 Count is an aggregate operation.
 For each aggregated column, it outputs the number of non null records as an integer.
+
+##### Integral
+
+Integral is an aggregate operation.
+For each aggregate column, it outputs the area under the curve of non null records.
+The curve is defined as function where the domain is the record times and the range is the record values.
+
+Integral has the following properties:
+
+* `unit` duration
+    unit is the time duration to use when computing the integral
 
 ##### Mean
 
@@ -825,9 +873,6 @@ All selector operations have the following properties:
 
 * `column` string
     column specifies a which column to use when selecting.
-* `timeValue` string
-    timeValue specifies which time value to use on the selected record.
-    The value must be the label of a column that exists on the input table.
 
 [IMPL#294](https://github.com/influxdata/ifql/issues/294) Remove concept of Kind from table columns
 
@@ -855,7 +900,6 @@ Min selects the minimum record from the input table.
 
 Sample is a selector operation.
 Sample selects a subset of the records from the input table.
-By default the sample operation uses `_time` as the `timeValue` for the operation.
 
 The following properties define how the sample is selected.
 
@@ -934,8 +978,12 @@ The key may modify and existing column or it may add a new column to the tables.
 If the column that is modified is part of the partition key, then the output tables will be repartitioned as needed.
 
 
+Set has the following properties:
+
 * `key` string
+    key is the label for the column to set
 * `value` string
+    value is the string value to set
 
 
 #### Sort
@@ -963,9 +1011,6 @@ Group has the following properties:
 *  `by` list of strings
     Group by these specific columns.
     Cannot be used with `except`.
-*  `keep` list of strings
-    Keep specific columns that were not in the `by` columns.
-    These columns will not be part of the table partition key, but will be present on the table.
 *  `except` list of strings
     Group by all other column except this list of columns.
     Cannot be used with `by`.
@@ -1015,9 +1060,8 @@ Window has the following properties:
 #### Join
 
 Join merges two or more input streams into a single output stream.
-Input tables are matched and then each of their records are joined into a single output table.
-Input tables match if their partition key values match for the provided list of join columns.
-The output table partition key will be the list of join columns.
+Input tables are matched on their partition keys and then each of their records are joined into a single output table.
+The output table partition key will be the same as the input table.
 
 The join operation compares values based on equality.
 
@@ -1033,19 +1077,70 @@ Join has the following properties:
     The parameter is an object where the value of each key is a corresponding record from the input streams.
     The return value must be an object which defines the output record structure.
 
-#### Covariance
+
 
 #### Cumulative sum
 
+Cumulative sum computes a running sum for non null records in the table.
+The output table schema will be the same as the input table.
+
+Cumulative sum has the following properties:
+
+* `columns` list string
+    columns is a list of columns on which to operate.
+
 #### Derivative
+
+Derivative computes the time based difference between subsequent non null records.
+
+Derivative has the following properties:
+
+* `unit` duration
+    unit is the time duration to use for the result
+* `nonNegative` bool
+    nonNegative indicates if the derivative is allowed to be negative.
+    If a value is encountered which is less than the previous value then it is assumed the previous value should have been a zero.
+* `columns` list strings
+    columns is a list of columns on which to compute the derivative
+* `timeSrc` string
+    timeSrc is the source column for the time values.
+    Defaults to `_time`.
 
 #### Difference
 
+Difference computes the difference between subsequent non null records.
+
+Difference has the following properties:
+
+* `nonNegative` bool
+    nonNegative indicates if the derivative is allowed to be negative.
+    If a value is encountered which is less than the previous value then it is assumed the previous value should have been a zero.
+* `columns` list strings
+    columns is a list of columns on which to compute the difference.
+
 #### Distinct
 
-#### Integral
+Distinct produces the unique values for a given column.
+
+Distinct has the following properties:
+
+* `column` string
+    column the column on which to track unique values.
+
 
 #### Shift
+
+Shift add a fixed duration to time columns.
+The output table schema is the same as the input table.
+
+Shift has the following properties:
+
+* `shift` duration
+    shift is the amount to add to each time value.
+    May be a negative duration.
+* `columns` list of strings
+    columns is the list of all columns that should be shifted.
+    Defaults to `["_start", "_stop", "_time"]`
 
 #### Type conversion operations
 

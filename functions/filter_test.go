@@ -70,8 +70,10 @@ func TestFilter_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID:   "count3",
-						Spec: &functions.CountOpSpec{},
+						ID: "count3",
+						Spec: &functions.CountOpSpec{
+							AggregateConfig: execute.DefaultAggregateConfig,
+						},
 					},
 				},
 				Edges: []query.Edge{
@@ -155,8 +157,10 @@ func TestFilter_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID:   "count3",
-						Spec: &functions.CountOpSpec{},
+						ID: "count3",
+						Spec: &functions.CountOpSpec{
+							AggregateConfig: execute.DefaultAggregateConfig,
+						},
 					},
 				},
 				Edges: []query.Edge{
@@ -225,8 +229,10 @@ func TestFilter_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID:   "count3",
-						Spec: &functions.CountOpSpec{},
+						ID: "count3",
+						Spec: &functions.CountOpSpec{
+							AggregateConfig: execute.DefaultAggregateConfig,
+						},
 					},
 				},
 				Edges: []query.Edge{
@@ -295,8 +301,10 @@ func TestFilter_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID:   "count3",
-						Spec: &functions.CountOpSpec{},
+						ID: "count3",
+						Spec: &functions.CountOpSpec{
+							AggregateConfig: execute.DefaultAggregateConfig,
+						},
 					},
 				},
 				Edges: []query.Edge{
@@ -365,8 +373,10 @@ func TestFilter_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID:   "count3",
-						Spec: &functions.CountOpSpec{},
+						ID: "count3",
+						Spec: &functions.CountOpSpec{
+							AggregateConfig: execute.DefaultAggregateConfig,
+						},
 					},
 				},
 				Edges: []query.Edge{
@@ -539,13 +549,9 @@ func TestFilter_Process(t *testing.T) {
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -553,13 +559,9 @@ func TestFilter_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(2), 6.0},
@@ -585,61 +587,53 @@ func TestFilter_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(1), 3.0},
-						{execute.Time(2), 6.0},
-						{execute.Time(2), 1.0},
+						{"a", execute.Time(1), 3.0},
+						{"a", execute.Time(2), 6.0},
+						{"a", execute.Time(2), 1.0},
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 3,
-						Stop:  5,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(3), 3.0},
-						{execute.Time(3), 2.0},
-						{execute.Time(4), 8.0},
+						{"b", execute.Time(3), 3.0},
+						{"b", execute.Time(3), 2.0},
+						{"b", execute.Time(4), 8.0},
 					},
 				},
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(2), 6.0},
+						{"a", execute.Time(2), 6.0},
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 3,
-						Stop:  5,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(4), 8.0},
+						{"b", execute.Time(4), 8.0},
 					},
 				},
 			},
@@ -688,15 +682,11 @@ func TestFilter_Process(t *testing.T) {
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString},
+					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0, "a", "x"},
@@ -705,15 +695,11 @@ func TestFilter_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-					{Label: "t1", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-					{Label: "t2", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "t1", Type: execute.TString},
+					{Label: "t2", Type: execute.TString},
 				},
 				Data: [][]interface{}{
 					{execute.Time(3), 8.0, "a", "y"},

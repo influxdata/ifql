@@ -153,28 +153,40 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.BinaryExpression{
-						Operator: ast.AdditionOperator,
-						Left: &semantic.MemberExpression{
-							Object: &semantic.IdentifierExpression{
-								Name: "r",
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
+								Value: &semantic.MemberExpression{
+									Object: &semantic.IdentifierExpression{
+										Name: "r",
+									},
+									Property: "_time",
+								},
 							},
-							Property: "_value",
-						},
-						Right: &semantic.FloatLiteral{
-							Value: 5,
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.BinaryExpression{
+									Operator: ast.AdditionOperator,
+									Left: &semantic.MemberExpression{
+										Object: &semantic.IdentifierExpression{
+											Name: "r",
+										},
+										Property: "_value",
+									},
+									Right: &semantic.FloatLiteral{
+										Value: 5,
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -182,13 +194,9 @@ func TestMap_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 6.0},
@@ -201,31 +209,43 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.BinaryExpression{
-						Operator: ast.MultiplicationOperator,
-						Left: &semantic.MemberExpression{
-							Object: &semantic.IdentifierExpression{
-								Name: "r",
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
+								Value: &semantic.MemberExpression{
+									Object: &semantic.IdentifierExpression{
+										Name: "r",
+									},
+									Property: "_time",
+								},
 							},
-							Property: "_value",
-						},
-						Right: &semantic.MemberExpression{
-							Object: &semantic.IdentifierExpression{
-								Name: "r",
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.BinaryExpression{
+									Operator: ast.MultiplicationOperator,
+									Left: &semantic.MemberExpression{
+										Object: &semantic.IdentifierExpression{
+											Name: "r",
+										},
+										Property: "_value",
+									},
+									Right: &semantic.MemberExpression{
+										Object: &semantic.IdentifierExpression{
+											Name: "r",
+										},
+										Property: "_value",
+									},
+								},
 							},
-							Property: "_value",
 						},
 					},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -233,13 +253,9 @@ func TestMap_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -252,30 +268,42 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.CallExpression{
-						Callee: &semantic.IdentifierExpression{Name: "float"},
-						Arguments: &semantic.ObjectExpression{
-							Properties: []*semantic.Property{{
-								Key: &semantic.Identifier{Name: "v"},
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
 								Value: &semantic.MemberExpression{
 									Object: &semantic.IdentifierExpression{
 										Name: "r",
 									},
-									Property: "_value",
+									Property: "_time",
 								},
-							}},
+							},
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.CallExpression{
+									Callee: &semantic.IdentifierExpression{Name: "float"},
+									Arguments: &semantic.ObjectExpression{
+										Properties: []*semantic.Property{{
+											Key: &semantic.Identifier{Name: "v"},
+											Value: &semantic.MemberExpression{
+												Object: &semantic.IdentifierExpression{
+													Name: "r",
+												},
+												Property: "_value",
+											},
+										}},
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TInt, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TInt},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), int64(1)},
@@ -283,13 +311,9 @@ func TestMap_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -302,30 +326,42 @@ func TestMap_Process(t *testing.T) {
 			spec: &functions.MapProcedureSpec{
 				Fn: &semantic.FunctionExpression{
 					Params: []*semantic.FunctionParam{{Key: &semantic.Identifier{Name: "r"}}},
-					Body: &semantic.CallExpression{
-						Callee: &semantic.IdentifierExpression{Name: "float"},
-						Arguments: &semantic.ObjectExpression{
-							Properties: []*semantic.Property{{
-								Key: &semantic.Identifier{Name: "v"},
+					Body: &semantic.ObjectExpression{
+						Properties: []*semantic.Property{
+							{
+								Key: &semantic.Identifier{Name: "_time"},
 								Value: &semantic.MemberExpression{
 									Object: &semantic.IdentifierExpression{
 										Name: "r",
 									},
-									Property: "_value",
+									Property: "_time",
 								},
-							}},
+							},
+							{
+								Key: &semantic.Identifier{Name: "_value"},
+								Value: &semantic.CallExpression{
+									Callee: &semantic.IdentifierExpression{Name: "float"},
+									Arguments: &semantic.ObjectExpression{
+										Properties: []*semantic.Property{{
+											Key: &semantic.Identifier{Name: "v"},
+											Value: &semantic.MemberExpression{
+												Object: &semantic.IdentifierExpression{
+													Name: "r",
+												},
+												Property: "_value",
+											},
+										}},
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TUInt, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TUInt},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), uint64(1)},
@@ -333,13 +369,9 @@ func TestMap_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},

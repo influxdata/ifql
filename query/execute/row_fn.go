@@ -112,9 +112,9 @@ func ConvertFromKind(k semantic.Kind) DataType {
 	}
 }
 
-func (f *rowFn) eval(row int, rr RowReader) (values.Value, error) {
+func (f *rowFn) eval(row int, cr ColReader) (values.Value, error) {
 	for _, r := range f.references {
-		f.record.Set(r, ValueForRow(row, f.recordCols[r], rr))
+		f.record.Set(r, ValueForRow(row, f.recordCols[r], cr))
 	}
 	f.scope[f.recordName] = f.record
 	return f.preparedFn.Eval(f.scope)
@@ -145,8 +145,8 @@ func (f *RowPredicateFn) Prepare(cols []ColMeta) error {
 	return nil
 }
 
-func (f *RowPredicateFn) Eval(row int, rr RowReader) (bool, error) {
-	v, err := f.rowFn.eval(row, rr)
+func (f *RowPredicateFn) Eval(row int, cr ColReader) (bool, error) {
+	v, err := f.rowFn.eval(row, cr)
 	if err != nil {
 		return false, err
 	}
@@ -192,8 +192,8 @@ func (f *RowMapFn) Type() semantic.Type {
 	return f.preparedFn.Type()
 }
 
-func (f *RowMapFn) Eval(row int, rr RowReader) (values.Object, error) {
-	v, err := f.rowFn.eval(row, rr)
+func (f *RowMapFn) Eval(row int, cr ColReader) (values.Object, error) {
+	v, err := f.rowFn.eval(row, cr)
 	if err != nil {
 		return nil, err
 	}
@@ -204,21 +204,21 @@ func (f *RowMapFn) Eval(row int, rr RowReader) (values.Object, error) {
 	return v.Object(), nil
 }
 
-func ValueForRow(i, j int, rr RowReader) values.Value {
-	t := rr.Cols()[j].Type
+func ValueForRow(i, j int, cr ColReader) values.Value {
+	t := cr.Cols()[j].Type
 	switch t {
 	case TString:
-		return values.NewStringValue(rr.AtString(i, j))
+		return values.NewStringValue(cr.Strings(j)[i])
 	case TInt:
-		return values.NewIntValue(rr.AtInt(i, j))
+		return values.NewIntValue(cr.Ints(j)[i])
 	case TUInt:
-		return values.NewUIntValue(rr.AtUInt(i, j))
+		return values.NewUIntValue(cr.UInts(j)[i])
 	case TFloat:
-		return values.NewFloatValue(rr.AtFloat(i, j))
+		return values.NewFloatValue(cr.Floats(j)[i])
 	case TBool:
-		return values.NewBoolValue(rr.AtBool(i, j))
+		return values.NewBoolValue(cr.Bools(j)[i])
 	case TTime:
-		return values.NewTimeValue(rr.AtTime(i, j))
+		return values.NewTimeValue(cr.Times(j)[i])
 	default:
 		PanicUnknownType(t)
 		return nil

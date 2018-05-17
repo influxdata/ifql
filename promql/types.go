@@ -293,10 +293,9 @@ func NewSelector(metric *Identifier, block, rng, offset interface{}) (*Selector,
 }
 
 type Aggregate struct {
-	Without    bool          `json:"without,omitempty"`
-	By         bool          `json:"by,omitempty"`
-	KeepCommon bool          `json:"keep_common,omitempty"`
-	Labels     []*Identifier `json:"labels,omitempty"`
+	Without bool          `json:"without,omitempty"`
+	By      bool          `json:"by,omitempty"`
+	Labels  []*Identifier `json:"labels,omitempty"`
 }
 
 func (a *Aggregate) QuerySpec() (*query.Operation, error) {
@@ -307,16 +306,10 @@ func (a *Aggregate) QuerySpec() (*query.Operation, error) {
 	for i := range a.Labels {
 		keys[i] = a.Labels[i].Name
 	}
-	var keep []string
-	if a.KeepCommon {
-		keep = make([]string, len(keys))
-		copy(keep, keys)
-	}
 	return &query.Operation{
 		ID: "merge",
 		Spec: &functions.GroupOpSpec{
-			By:   keys,
-			Keep: keep,
+			By: keys,
 		},
 	}, nil
 }

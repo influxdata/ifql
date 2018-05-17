@@ -80,27 +80,20 @@ func createMeanTransformation(id execute.DatasetID, mode execute.AccumulationMod
 	return t, d, nil
 }
 
-func (a *MeanAgg) reset() {
-	a.count = 0
-	a.sum = 0
-}
 func (a *MeanAgg) NewBoolAgg() execute.DoBoolAgg {
 	return nil
 }
 
 func (a *MeanAgg) NewIntAgg() execute.DoIntAgg {
-	a.reset()
-	return a
+	return new(MeanAgg)
 }
 
 func (a *MeanAgg) NewUIntAgg() execute.DoUIntAgg {
-	a.reset()
-	return a
+	return new(MeanAgg)
 }
 
 func (a *MeanAgg) NewFloatAgg() execute.DoFloatAgg {
-	a.reset()
-	return a
+	return new(MeanAgg)
 }
 
 func (a *MeanAgg) NewStringAgg() execute.DoStringAgg {

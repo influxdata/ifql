@@ -14,13 +14,16 @@ import (
 const CovarianceKind = "covariance"
 
 type CovarianceOpSpec struct {
-	PearsonCorrelation bool `json:"pearsonr"`
+	PearsonCorrelation bool   `json:"pearsonr"`
+	ValueDst           string `json:"value_dst"`
+	execute.AggregateConfig
 }
 
 var covarianceSignature = query.DefaultFunctionSignature()
 
 func init() {
 	covarianceSignature.Params["pearsonr"] = semantic.Bool
+	covarianceSignature.Params["columns"] = semantic.Array
 
 	query.RegisterBuiltIn("covariance", covarianceBuiltIn)
 	query.RegisterFunction(CovarianceKind, createCovarianceOpSpec, covarianceSignature)
@@ -37,7 +40,7 @@ cov = (x,y,on,pearsonr=false) =>
         on:on,
         fn: (t) => ({x:t.x._value, y:t.y._value}),
     )
-    |> covariance(pearsonr:pearsonr)
+    |> covariance(pearsonr:pearsonr, columns:["x","y"])
 
 pearsonr = (x,y,on) => cov(x:x, y:y, on:on, pearsonr:true)
 `
@@ -54,6 +57,22 @@ func createCovarianceOpSpec(args query.Arguments, a *query.Administration) (quer
 	} else if ok {
 		spec.PearsonCorrelation = pearsonr
 	}
+
+	label, ok, err := args.GetString("valueDst")
+	if err != nil {
+		return nil, err
+	} else if ok {
+		spec.ValueDst = label
+	} else {
+		spec.ValueDst = execute.DefaultValueColLabel
+	}
+
+	if err := spec.AggregateConfig.ReadArgs(args); err != nil {
+		return nil, err
+	}
+	if len(spec.Columns) != 2 {
+		return nil, errors.New("must provide exactly two columns")
+	}
 	return spec, nil
 }
 
@@ -67,6 +86,8 @@ func (s *CovarianceOpSpec) Kind() query.OperationKind {
 
 type CovarianceProcedureSpec struct {
 	PearsonCorrelation bool
+	ValueLabel         string
+	execute.AggregateConfig
 }
 
 func newCovarianceProcedure(qs query.OperationSpec, pa plan.Administration) (plan.ProcedureSpec, error) {
@@ -77,14 +98,22 @@ func newCovarianceProcedure(qs query.OperationSpec, pa plan.Administration) (pla
 
 	return &CovarianceProcedureSpec{
 		PearsonCorrelation: spec.PearsonCorrelation,
+		ValueLabel:         spec.ValueDst,
+		AggregateConfig:    spec.AggregateConfig,
 	}, nil
 }
 
 func (s *CovarianceProcedureSpec) Kind() plan.ProcedureKind {
 	return CovarianceKind
 }
+
 func (s *CovarianceProcedureSpec) Copy() plan.ProcedureSpec {
-	return new(CovarianceProcedureSpec)
+	ns := new(CovarianceProcedureSpec)
+	*ns = *s
+
+	ns.AggregateConfig = s.AggregateConfig.Copy()
+
+	return ns
 }
 
 type CovarianceTransformation struct {
@@ -110,77 +139,60 @@ func createCovarianceTransformation(id execute.DatasetID, mode execute.Accumulat
 	}
 	cache := execute.NewBlockBuilderCache(a.Allocator())
 	d := execute.NewDataset(id, mode, cache)
-	t := NewCovarianceTransformation(d, cache, s, a.Bounds())
+	t := NewCovarianceTransformation(d, cache, s)
 	return t, d, nil
 }
 
-func NewCovarianceTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *CovarianceProcedureSpec, bounds execute.Bounds) *CovarianceTransformation {
+func NewCovarianceTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *CovarianceProcedureSpec) *CovarianceTransformation {
 	return &CovarianceTransformation{
-		d:      d,
-		cache:  cache,
-		bounds: bounds,
-		spec:   *spec,
+		d:     d,
+		cache: cache,
+		spec:  *spec,
 	}
 }
 
-func (t *CovarianceTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	key := execute.ToBlockKey(meta)
+func (t *CovarianceTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
 	return t.d.RetractBlock(key)
 }
 
 func (t *CovarianceTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	cols := b.Cols()
-	builder, new := t.cache.BlockBuilder(blockMetadata{
-		bounds: t.bounds,
-		tags:   b.Tags(),
+	builder, created := t.cache.BlockBuilder(b.Key())
+	if !created {
+		return fmt.Errorf("covariance found duplicate block with key: %v", b.Key())
+	}
+	execute.AddBlockKeyCols(b.Key(), builder)
+	builder.AddCol(execute.ColMeta{
+		Label: t.spec.TimeDst,
+		Type:  execute.TTime,
 	})
-	if new {
-		builder.AddCol(execute.TimeCol)
-		execute.AddTags(b.Tags(), builder)
-		builder.AddCol(execute.ColMeta{
-			Label: execute.DefaultValueColLabel,
-			Kind:  execute.ValueColKind,
-			Type:  execute.TFloat,
-		})
-	}
-	var xIdx, yIdx = -1, -1
-	for j, c := range cols {
-		if c.IsValue() {
-			if xIdx == -1 {
-				xIdx = j
-			} else if yIdx == -1 {
-				yIdx = j
-			} else {
-				return errors.New("covariance only supports two values")
-			}
-		}
-	}
-	if xIdx == -1 {
-		return errors.New("covariance must receive exactly two value columns, no value columns found")
-	}
-	if yIdx == -1 {
-		return errors.New("covariance must receive exactly two value columns, only one value column found")
-	}
+	valueIdx := builder.AddCol(execute.ColMeta{
+		Label: t.spec.ValueLabel,
+		Type:  execute.TFloat,
+	})
+	xIdx := execute.ColIdx(t.spec.Columns[0], cols)
+	yIdx := execute.ColIdx(t.spec.Columns[1], cols)
+
 	if cols[xIdx].Type != cols[yIdx].Type {
 		return errors.New("cannot compute the covariance between different types")
 	}
-	t.yIdx = yIdx
-	t.reset()
-	values := b.Col(xIdx)
-	switch typ := cols[xIdx].Type; typ {
-	case execute.TFloat:
-		values.DoFloat(t.DoFloat)
-	default:
-		return fmt.Errorf("covariance does not support %v", typ)
+	if err := execute.AppendAggregateTime(t.spec.TimeSrc, t.spec.TimeDst, b.Key(), builder); err != nil {
+		return err
 	}
 
-	timeIdx := 0
-	valueIdx := len(builder.Cols()) - 1
+	t.reset()
+	b.Do(func(cr execute.ColReader) error {
+		switch typ := cols[xIdx].Type; typ {
+		case execute.TFloat:
+			t.DoFloat(cr.Floats(xIdx), cr.Floats(yIdx))
+		default:
+			return fmt.Errorf("covariance does not support %v", typ)
+		}
+		return nil
+	})
 
-	// Add row for aggregate values
-	builder.AppendTime(timeIdx, b.Bounds().Stop)
+	execute.AppendKeyValues(b.Key(), builder)
 	builder.AppendFloat(valueIdx, t.value())
-
 	return nil
 }
 
@@ -192,10 +204,10 @@ func (t *CovarianceTransformation) reset() {
 	t.ym2 = 0
 	t.xym2 = 0
 }
-func (t *CovarianceTransformation) DoFloat(xs []float64, rr execute.RowReader) {
+func (t *CovarianceTransformation) DoFloat(xs, ys []float64) {
 	var xdelta, ydelta, xdelta2, ydelta2 float64
 	for i, x := range xs {
-		y := rr.AtFloat(i, t.yIdx)
+		y := ys[i]
 
 		t.n++
 

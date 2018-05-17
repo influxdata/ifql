@@ -50,13 +50,9 @@ func TestSort_Process(t *testing.T) {
 				Desc: false,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 2.0},
@@ -64,13 +60,9 @@ func TestSort_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(2), 1.0},
@@ -85,13 +77,9 @@ func TestSort_Process(t *testing.T) {
 				Desc: true,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -99,13 +87,9 @@ func TestSort_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(2), 2.0},
@@ -120,13 +104,9 @@ func TestSort_Process(t *testing.T) {
 				Desc: false,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(2), 2.0},
@@ -135,13 +115,9 @@ func TestSort_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -157,13 +133,9 @@ func TestSort_Process(t *testing.T) {
 				Desc: true,
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(1), 1.0},
@@ -172,13 +144,9 @@ func TestSort_Process(t *testing.T) {
 				},
 			}},
 			want: []*executetest.Block{{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  3,
-				},
 				ColMeta: []execute.ColMeta{
-					{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-					{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_value", Type: execute.TFloat},
 				},
 				Data: [][]interface{}{
 					{execute.Time(2), 2.0},
@@ -195,65 +163,57 @@ func TestSort_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(1), 3.0},
-						{execute.Time(2), 2.0},
-						{execute.Time(2), 1.0},
+						{"a", execute.Time(1), 3.0},
+						{"a", execute.Time(2), 2.0},
+						{"a", execute.Time(2), 1.0},
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 3,
-						Stop:  5,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(3), 3.0},
-						{execute.Time(3), 2.0},
-						{execute.Time(4), 1.0},
+						{"b", execute.Time(3), 3.0},
+						{"b", execute.Time(3), 2.0},
+						{"b", execute.Time(4), 1.0},
 					},
 				},
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(2), 1.0},
-						{execute.Time(2), 2.0},
-						{execute.Time(1), 3.0},
+						{"a", execute.Time(2), 1.0},
+						{"a", execute.Time(2), 2.0},
+						{"a", execute.Time(1), 3.0},
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 3,
-						Stop:  5,
-					},
+					KeyCols: []string{"t1"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
+						{Label: "t1", Type: execute.TString},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
 					},
 					Data: [][]interface{}{
-						{execute.Time(4), 1.0},
-						{execute.Time(3), 2.0},
-						{execute.Time(3), 3.0},
+						{"b", execute.Time(4), 1.0},
+						{"b", execute.Time(3), 2.0},
+						{"b", execute.Time(3), 3.0},
 					},
 				},
 			},
@@ -266,15 +226,12 @@ func TestSort_Process(t *testing.T) {
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "host", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "_field", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostA", "F1"},
@@ -286,15 +243,12 @@ func TestSort_Process(t *testing.T) {
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "host", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "_field", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostB", "F1"},
@@ -308,15 +262,12 @@ func TestSort_Process(t *testing.T) {
 			},
 			want: []*executetest.Block{
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "host", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "_field", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostA", "F1"},
@@ -328,15 +279,12 @@ func TestSort_Process(t *testing.T) {
 					},
 				},
 				{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  3,
-					},
+					KeyCols: []string{"host"},
 					ColMeta: []execute.ColMeta{
-						{Label: "_time", Type: execute.TTime, Kind: execute.TimeColKind},
-						{Label: "_value", Type: execute.TFloat, Kind: execute.ValueColKind},
-						{Label: "host", Type: execute.TString, Kind: execute.TagColKind, Common: true},
-						{Label: "_field", Type: execute.TString, Kind: execute.TagColKind, Common: false},
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "host", Type: execute.TString},
+						{Label: "_field", Type: execute.TString},
 					},
 					Data: [][]interface{}{
 						{execute.Time(1), 1.0, "hostB", "F1"},
