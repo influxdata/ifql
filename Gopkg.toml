@@ -1,7 +1,7 @@
 required = ["github.com/mna/pigeon", "github.com/goreleaser/goreleaser"]
 
 [[constraint]]
-  branch = "master"
+  version = "0.2.0"
   name = "github.com/google/go-cmp"
 
 [[override]]
