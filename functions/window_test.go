@@ -619,7 +619,10 @@ func TestFixedWindow_Process(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			got := executetest.BlocksFromCache(c)
+			got, err := executetest.BlocksFromCache(c)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			sort.Sort(executetest.SortedBlocks(got))
 			want := tc.want(start)

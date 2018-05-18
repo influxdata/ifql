@@ -360,7 +360,11 @@ func TestExecutor_Execute(t *testing.T) {
 			got := make(map[string][]*executetest.Block, len(results))
 			for name, r := range results {
 				if err := r.Blocks().Do(func(b execute.Block) error {
-					got[name] = append(got[name], executetest.ConvertBlock(b))
+					cb, err := executetest.ConvertBlock(b)
+					if err != nil {
+						return err
+					}
+					got[name] = append(got[name], cb)
 					return nil
 				}); err != nil {
 					t.Fatal(err)
