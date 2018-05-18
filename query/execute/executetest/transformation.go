@@ -35,6 +35,9 @@ func ProcessTestHelper(
 		t.Fatal(err)
 	}
 
+	NormalizeBlocks(got)
+	NormalizeBlocks(want)
+
 	sort.Sort(SortedBlocks(got))
 	sort.Sort(SortedBlocks(want))
 

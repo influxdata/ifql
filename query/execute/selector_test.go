@@ -195,6 +195,9 @@ func TestRowSelector_Process(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			executetest.NormalizeBlocks(got)
+			executetest.NormalizeBlocks(tc.want)
+
 			sort.Sort(executetest.SortedBlocks(got))
 			sort.Sort(executetest.SortedBlocks(tc.want))
 
@@ -349,6 +352,9 @@ func TestIndexSelector_Process(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			executetest.NormalizeBlocks(got)
+			executetest.NormalizeBlocks(tc.want)
 
 			sort.Sort(executetest.SortedBlocks(got))
 			sort.Sort(executetest.SortedBlocks(tc.want))

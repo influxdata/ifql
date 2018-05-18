@@ -6,13 +6,45 @@ import (
 	"github.com/influxdata/ifql/query/execute"
 )
 
+// Block is an implementation of execute.Block
+// It is designed to make it easy to statically declare the data within the block.
+// Not all fields need to be set. See comments on each field.
+// Use Normalize to ensure that all fields are set before equality comparisons.
 type Block struct {
+	// PartitionKey of the block. Does not need to be set explicitly.
 	PartitionKey execute.PartitionKey
-	KeyCols      []string
-	ColMeta      []execute.ColMeta
+	// KeyCols is a list of column that are part of the partition key.
+	// The column type is deduced from the ColMeta slice.
+	KeyCols []string
+	// KeyValues is a list of values for the partition key columns.
+	// Only needs to be set when no data is present on the Block.
+	KeyValues []interface{}
+	// ColMeta is a list of columns of the block.
+	ColMeta []execute.ColMeta
 	// Data is a list of rows, i.e. Data[row][col]
 	// Each row must be a list with length equal to len(ColMeta)
 	Data [][]interface{}
+}
+
+// Normalize ensures all fields of the Block are set correctly.
+func (b *Block) Normalize() {
+	if b.PartitionKey == nil {
+		cols := make([]execute.ColMeta, len(b.KeyCols))
+		if len(b.KeyValues) != len(b.KeyCols) {
+			b.KeyValues = make([]interface{}, len(b.KeyCols))
+		}
+		for j, label := range b.KeyCols {
+			idx := execute.ColIdx(label, b.ColMeta)
+			if idx < 0 {
+				panic(fmt.Errorf("block invalid: missing partition column %q", label))
+			}
+			cols[j] = b.ColMeta[idx]
+			if len(b.Data) > 0 {
+				b.KeyValues[j] = b.Data[0][idx]
+			}
+		}
+		b.PartitionKey = execute.NewPartitionKey(cols, b.KeyValues)
+	}
 }
 
 func (b *Block) RefCount(n int) {}
@@ -22,16 +54,7 @@ func (b *Block) Cols() []execute.ColMeta {
 }
 
 func (b *Block) Key() execute.PartitionKey {
-	if b.PartitionKey == nil {
-		cols := make([]execute.ColMeta, len(b.KeyCols))
-		values := make([]interface{}, len(b.KeyCols))
-		for j, label := range b.KeyCols {
-			idx := execute.ColIdx(label, b.ColMeta)
-			cols[j] = b.ColMeta[idx]
-			values[j] = b.Data[0][idx]
-		}
-		b.PartitionKey = execute.NewPartitionKey(cols, values)
-	}
+	b.Normalize()
 	return b.PartitionKey
 }
 
@@ -110,17 +133,20 @@ func BlocksFromCache(c execute.DataCache) (blocks []*Block, err error) {
 }
 
 func ConvertBlock(b execute.Block) (*Block, error) {
+	key := b.Key()
 	blk := &Block{
-		ColMeta: b.Cols(),
+		PartitionKey: key,
+		ColMeta:      b.Cols(),
 	}
 
-	keyCols := b.Key().Cols()
+	keyCols := key.Cols()
 	if len(keyCols) > 0 {
-		keys := make([]string, len(keyCols))
+		blk.KeyCols = make([]string, len(keyCols))
+		blk.KeyValues = make([]interface{}, len(keyCols))
 		for j, c := range keyCols {
-			keys[j] = c.Label
+			blk.KeyCols[j] = c.Label
+			blk.KeyValues[j] = key.Value(j)
 		}
-		blk.KeyCols = keys
 	}
 
 	err := b.Do(func(cr execute.ColReader) error {
@@ -169,4 +195,11 @@ func (b SortedBlocks) Less(i int, j int) bool {
 
 func (b SortedBlocks) Swap(i int, j int) {
 	b[i], b[j] = b[j], b[i]
+}
+
+// NormalizeBlocks ensures that each block is normalized
+func NormalizeBlocks(bs []*Block) {
+	for _, b := range bs {
+		b.Key()
+	}
 }

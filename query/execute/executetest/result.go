@@ -2,19 +2,22 @@ package executetest
 
 import "github.com/influxdata/ifql/query/execute"
 
-
 type Result struct {
-	blocks []*Block
+	Blks []*Block
 }
 
 func NewResult(blocks []*Block) *Result {
-	return &Result{blocks:blocks}
+	return &Result{Blks: blocks}
 }
 
 func (r *Result) Blocks() execute.BlockIterator {
 	return &BlockIterator{
-		r.blocks,
+		r.Blks,
 	}
+}
+
+func (r *Result) Normalize() {
+	NormalizeBlocks(r.Blks)
 }
 
 type BlockIterator struct {

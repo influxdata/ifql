@@ -624,8 +624,12 @@ func TestFixedWindow_Process(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			sort.Sort(executetest.SortedBlocks(got))
 			want := tc.want(start)
+
+			executetest.NormalizeBlocks(got)
+			executetest.NormalizeBlocks(want)
+
+			sort.Sort(executetest.SortedBlocks(got))
 			sort.Sort(executetest.SortedBlocks(want))
 
 			if !cmp.Equal(want, got) {
