@@ -15,7 +15,7 @@ import (
 	"github.com/influxdata/ifql/query/querytest"
 )
 
-func TestOutputHTTP_NewQuery(t *testing.T) {
+func TestToHTTP_NewQuery(t *testing.T) {
 	tests := []querytest.NewQueryTestCase{
 		{
 			Name: "from with database with range",
@@ -30,12 +30,12 @@ func TestOutputHTTP_NewQuery(t *testing.T) {
 					},
 					{
 						ID: "outputHTTP1",
-						Spec: &functions.OutputHTTPOpSpec{
+						Spec: &functions.ToHTTPOpSpec{
 							Addr:         "https://localhost:8081",
 							Name:         "series1",
 							Method:       "POST",
 							Timeout:      50 * time.Second,
-							TimeColumn:   execute.TimeColLabel,
+							TimeColumn:   execute.DefaultTimeColLabel,
 							ValueColumns: []string{execute.DefaultValueColLabel},
 							Headers:      map[string]string{"Content-Type": "application/vnd.influx"},
 						},
@@ -56,7 +56,7 @@ func TestOutputHTTP_NewQuery(t *testing.T) {
 	}
 }
 
-func TestOutputHTTPOpSpec_UnmarshalJSON(t *testing.T) {
+func TestToHTTPOpSpec_UnmarshalJSON(t *testing.T) {
 	type fields struct {
 		Addr        string
 		Method      string
@@ -105,7 +105,7 @@ func TestOutputHTTPOpSpec_UnmarshalJSON(t *testing.T) {
 		}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			o := &functions.OutputHTTPOpSpec{
+			o := &functions.ToHTTPOpSpec{
 				Addr:        tt.fields.Addr,
 				Method:      tt.fields.Method,
 				Headers:     tt.fields.Headers,
@@ -120,13 +120,13 @@ func TestOutputHTTPOpSpec_UnmarshalJSON(t *testing.T) {
 			if !tt.wantErr {
 				querytest.OperationMarshalingTestHelper(t, tt.bytes, op)
 			} else if err := o.UnmarshalJSON(tt.bytes); err == nil {
-				t.Errorf("OutputHTTPOpSpec.UnmarshalJSON() error = %v, wantErr %v for test %s", err, tt.wantErr, tt.name)
+				t.Errorf("ToHTTPOpSpec.UnmarshalJSON() error = %v, wantErr %v for test %s", err, tt.wantErr, tt.name)
 			}
 		})
 	}
 }
 
-func TestOutputHTTP_Process(t *testing.T) {
+func TestToHTTP_Process(t *testing.T) {
 	data := []byte{}
 	wg := sync.WaitGroup{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -144,27 +144,23 @@ func TestOutputHTTP_Process(t *testing.T) {
 	}
 	testCases := []struct {
 		name string
-		spec *functions.OutputHTTPProcedureSpec
+		spec *functions.ToHTTPProcedureSpec
 		data []execute.Block
 		want wanted
 	}{
 		{
 			name: "one block",
-			spec: &functions.OutputHTTPProcedureSpec{
-				Spec: &functions.OutputHTTPOpSpec{
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
 					Addr:         server.URL,
 					Method:       "POST",
 					Timeout:      50 * time.Second,
-					TimeColumn:   execute.TimeColLabel,
+					TimeColumn:   execute.DefaultTimeColLabel,
 					ValueColumns: []string{"_value"},
 					Name:         "one_block",
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
@@ -183,21 +179,17 @@ func TestOutputHTTP_Process(t *testing.T) {
 		},
 		{
 			name: "one block with unused tag",
-			spec: &functions.OutputHTTPProcedureSpec{
-				Spec: &functions.OutputHTTPOpSpec{
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
 					Addr:         server.URL,
 					Method:       "GET",
 					Timeout:      50 * time.Second,
-					TimeColumn:   execute.TimeColLabel,
+					TimeColumn:   execute.DefaultTimeColLabel,
 					ValueColumns: []string{"_value"},
 					Name:         "one_block_w_unused_tag",
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
@@ -221,22 +213,18 @@ one_block_w_unused_tag _value=4 41
 		},
 		{
 			name: "one block with tag",
-			spec: &functions.OutputHTTPProcedureSpec{
-				Spec: &functions.OutputHTTPOpSpec{
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
 					Addr:         server.URL,
 					Method:       "GET",
 					Timeout:      50 * time.Second,
-					TimeColumn:   execute.TimeColLabel,
+					TimeColumn:   execute.DefaultTimeColLabel,
 					ValueColumns: []string{"_value"},
 					TagColumns:   []string{"fred"},
 					Name:         "one_block_w_tag",
 				},
 			},
 			data: []execute.Block{&executetest.Block{
-				Bnds: execute.Bounds{
-					Start: 1,
-					Stop:  5,
-				},
 				ColMeta: []execute.ColMeta{
 					{Label: "_time", Type: execute.TTime},
 					{Label: "_value", Type: execute.TFloat},
@@ -260,12 +248,12 @@ one_block_w_tag,fred=elevendyone _value=4 41
 		},
 		{
 			name: "multi block",
-			spec: &functions.OutputHTTPProcedureSpec{
-				Spec: &functions.OutputHTTPOpSpec{
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
 					Addr:         server.URL,
 					Method:       "GET",
 					Timeout:      50 * time.Second,
-					TimeColumn:   execute.TimeColLabel,
+					TimeColumn:   execute.DefaultTimeColLabel,
 					ValueColumns: []string{"_value"},
 					TagColumns:   []string{"fred"},
 					Name:         "multi_block",
@@ -273,10 +261,6 @@ one_block_w_tag,fred=elevendyone _value=4 41
 			},
 			data: []execute.Block{
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  5,
-					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
@@ -289,10 +273,6 @@ one_block_w_tag,fred=elevendyone _value=4 41
 					},
 				},
 				&executetest.Block{
-					Bnds: execute.Bounds{
-						Start: 1,
-						Stop:  5,
-					},
 					ColMeta: []execute.ColMeta{
 						{Label: "_time", Type: execute.TTime},
 						{Label: "_value", Type: execute.TFloat},
@@ -323,7 +303,7 @@ one_block_w_tag,fred=elevendyone _value=4 41
 				tc.data,
 				tc.want.Block,
 				func(d execute.Dataset, c execute.BlockBuilderCache) execute.Transformation {
-					return functions.NewOutputHTTPTransformation(d, c, tc.spec)
+					return functions.NewToHTTPTransformation(d, c, tc.spec)
 				},
 			)
 			wg.Wait() // wait till we are done getting the data back

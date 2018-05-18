@@ -22,11 +22,12 @@ import (
 )
 
 const (
-	OutputHTTPKind           = "outputHTTP"
-	defaultOutputHTTPTimeout = 1 * time.Second
+	ToHTTPKind           = "toHTTP"
+	DefaultToHTTPTimeout = 1 * time.Second
 )
 
-var outputHTTPUserAgent = "ifqld/dev"
+// DefaultToHTTPUserAgent is the default user agent used by ToHttp
+var DefaultToHTTPUserAgent = "ifqld/dev"
 
 func newOutPutClient() *http.Client {
 	return &http.Client{
@@ -46,13 +47,13 @@ func newOutPutClient() *http.Client {
 	}
 }
 
-var outputHTTPKeepAliveClient = newOutPutClient()
+var toHTTPKeepAliveClient = newOutPutClient()
 
-// this is used so we can get better validation on marshaling, innerOutputHTTPOpSpec and OutputHTTPOpSpec
+// this is used so we can get better validation on marshaling, innerToHTTPOpSpec and ToHTTPOpSpec
 // need to have identical fields
-type innerOutputHTTPOpSpec OutputHTTPOpSpec
+type innerToHTTPOpSpec ToHTTPOpSpec
 
-type OutputHTTPOpSpec struct {
+type ToHTTPOpSpec struct {
 	Addr         string            `json:"addr"`
 	Method       string            `json:"method"` // default behavior should be POST
 	Name         string            `json:"name"`
@@ -66,18 +67,18 @@ type OutputHTTPOpSpec struct {
 }
 
 func init() {
-	query.RegisterFunction(OutputHTTPKind, createOutputHTTPOpSpec, outputHTTPSignature)
-	query.RegisterOpSpec(OutputHTTPKind,
-		func() query.OperationSpec { return &OutputHTTPOpSpec{} })
-	plan.RegisterProcedureSpec(OutputHTTPKind, newOutputHTTPProcedure, OutputHTTPKind)
-	execute.RegisterTransformation(OutputHTTPKind, createOutputHTTPTransformation)
+	query.RegisterFunction(ToHTTPKind, createToHTTPOpSpec, ToHTTPSignature)
+	query.RegisterOpSpec(ToHTTPKind,
+		func() query.OperationSpec { return &ToHTTPOpSpec{} })
+	plan.RegisterProcedureSpec(ToHTTPKind, newToHTTPProcedure, ToHTTPKind)
+	execute.RegisterTransformation(ToHTTPKind, createToHTTPTransformation)
 }
 
-// ReadArgs loads a query.Arguments into OutputHTTPOpSpec.  It sets several default values.
+// ReadArgs loads a query.Arguments into ToHTTPOpSpec.  It sets several default values.
 // If the http method isn't set, it defaults to POST, it also uppercases the http method.
 // If the time_column isn't set, it defaults to execute.TimeColLabel.
 // If the value_column isn't set it defaults to a []string{execute.DefaultValueColLabel}.
-func (o *OutputHTTPOpSpec) ReadArgs(args query.Arguments) error {
+func (o *ToHTTPOpSpec) ReadArgs(args query.Arguments) error {
 	var err error
 	o.Addr, err = args.GetRequiredString("addr")
 	if err != nil {
@@ -104,7 +105,7 @@ func (o *OutputHTTPOpSpec) ReadArgs(args query.Arguments) error {
 		return err
 	}
 	if !ok {
-		o.Timeout = defaultOutputHTTPTimeout
+		o.Timeout = DefaultToHTTPTimeout
 	} else {
 		o.Timeout = time.Duration(timeout)
 	}
@@ -114,7 +115,7 @@ func (o *OutputHTTPOpSpec) ReadArgs(args query.Arguments) error {
 		return err
 	}
 	if !ok {
-		o.TimeColumn = execute.TimeColLabel
+		o.TimeColumn = execute.DefaultTimeColLabel
 	}
 
 	tagColumns, ok, err := args.GetArray("tag_columns", semantic.String)
@@ -145,17 +146,20 @@ func (o *OutputHTTPOpSpec) ReadArgs(args query.Arguments) error {
 	}
 
 	// TODO: get other headers working!
-	o.Headers = map[string]string{"Content-Type": "application/vnd.influx"}
+	o.Headers = map[string]string{
+		"Content-Type": "application/vnd.influx",
+		"User-Agent":   DefaultToHTTPUserAgent,
+	}
 
 	return err
 
 }
 
-func createOutputHTTPOpSpec(args query.Arguments, a *query.Administration) (query.OperationSpec, error) {
+func createToHTTPOpSpec(args query.Arguments, a *query.Administration) (query.OperationSpec, error) {
 	if err := a.AddParentFromArgs(args); err != nil {
 		return nil, err
 	}
-	s := new(OutputHTTPOpSpec)
+	s := new(ToHTTPOpSpec)
 	if err := s.ReadArgs(args); err != nil {
 		return nil, err
 	}
@@ -165,10 +169,10 @@ func createOutputHTTPOpSpec(args query.Arguments, a *query.Administration) (quer
 	return s, nil
 }
 
-// UnmarshalJSON unmarshals and validates OutputHTTPOpSpec into JSON.
-func (o *OutputHTTPOpSpec) UnmarshalJSON(b []byte) (err error) {
+// UnmarshalJSON unmarshals and validates toHTTPOpSpec into JSON.
+func (o *ToHTTPOpSpec) UnmarshalJSON(b []byte) (err error) {
 
-	if err = json.Unmarshal(b, (*innerOutputHTTPOpSpec)(o)); err != nil {
+	if err = json.Unmarshal(b, (*innerToHTTPOpSpec)(o)); err != nil {
 		return err
 	}
 	u, err := url.ParseRequestURI(o.Addr)
@@ -181,57 +185,56 @@ func (o *OutputHTTPOpSpec) UnmarshalJSON(b []byte) (err error) {
 	return nil
 }
 
-var outputHTTPSignature = query.DefaultFunctionSignature()
+var ToHTTPSignature = query.DefaultFunctionSignature()
 
-func (OutputHTTPOpSpec) Kind() query.OperationKind {
-	return OutputHTTPKind
+func (ToHTTPOpSpec) Kind() query.OperationKind {
+	return ToHTTPKind
 }
 
-type OutputHTTPProcedureSpec struct {
-	Spec *OutputHTTPOpSpec
+type ToHTTPProcedureSpec struct {
+	Spec *ToHTTPOpSpec
 }
 
-func (o *OutputHTTPProcedureSpec) Kind() plan.ProcedureKind {
+func (o *ToHTTPProcedureSpec) Kind() plan.ProcedureKind {
 	return CountKind
 }
 
-func (o *OutputHTTPProcedureSpec) Copy() plan.ProcedureSpec {
-	return &OutputHTTPProcedureSpec{}
+func (o *ToHTTPProcedureSpec) Copy() plan.ProcedureSpec {
+	return &ToHTTPProcedureSpec{}
 }
 
-func newOutputHTTPProcedure(qs query.OperationSpec, a plan.Administration) (plan.ProcedureSpec, error) {
-	spec, ok := qs.(*OutputHTTPOpSpec)
+func newToHTTPProcedure(qs query.OperationSpec, a plan.Administration) (plan.ProcedureSpec, error) {
+	spec, ok := qs.(*ToHTTPOpSpec)
 	if !ok && spec != nil {
 		return nil, fmt.Errorf("invalid spec type %T", qs)
 	}
-	return &OutputHTTPProcedureSpec{Spec: spec}, nil
+	return &ToHTTPProcedureSpec{Spec: spec}, nil
 }
 
-func createOutputHTTPTransformation(id execute.DatasetID, mode execute.AccumulationMode, spec plan.ProcedureSpec, a execute.Administration) (execute.Transformation, execute.Dataset, error) {
-	s, ok := spec.(*OutputHTTPProcedureSpec)
+func createToHTTPTransformation(id execute.DatasetID, mode execute.AccumulationMode, spec plan.ProcedureSpec, a execute.Administration) (execute.Transformation, execute.Dataset, error) {
+	s, ok := spec.(*ToHTTPProcedureSpec)
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid spec type %T", spec)
 	}
 	cache := execute.NewBlockBuilderCache(a.Allocator())
 	d := execute.NewDataset(id, mode, cache)
-	t := NewOutputHTTPTransformation(d, cache, s)
+	t := NewToHTTPTransformation(d, cache, s)
 	return t, d, nil
 }
 
-type OutputHTTPTransformation struct {
+type ToHTTPTransformation struct {
 	d     execute.Dataset
 	cache execute.BlockBuilderCache
-	spec  *OutputHTTPProcedureSpec
+	spec  *ToHTTPProcedureSpec
 }
 
-func (t *OutputHTTPTransformation) RetractBlock(id execute.DatasetID, meta execute.BlockMetadata) error {
-	key := execute.ToBlockKey(meta)
+func (t *ToHTTPTransformation) RetractBlock(id execute.DatasetID, key execute.PartitionKey) error {
 	return t.d.RetractBlock(key)
 }
 
-func NewOutputHTTPTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *OutputHTTPProcedureSpec) *OutputHTTPTransformation {
+func NewToHTTPTransformation(d execute.Dataset, cache execute.BlockBuilderCache, spec *ToHTTPProcedureSpec) *ToHTTPTransformation {
 
-	return &OutputHTTPTransformation{
+	return &ToHTTPTransformation{
 		d:     d,
 		cache: cache,
 		spec:  spec,
@@ -271,7 +274,7 @@ type idxType struct {
 	Type execute.DataType
 }
 
-func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block) error {
+func (t *ToHTTPTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	pr, pw := io.Pipe() // TODO: replce the pipe with something faster
 	m := &httpOutputMetric{}
 	e := protocol.NewEncoder(pw)
@@ -291,45 +294,42 @@ func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block
 	if timeColIdx.Type != execute.TTime {
 		return fmt.Errorf("column %s is not of type %s", timeColLabel, timeColIdx.Type)
 	}
-	iter := b.Col(timeColIdx.Idx)
 	var err error
 	go func() {
 		m.name = t.spec.Spec.Name
-		iter.DoTime(func(et []execute.Time, er execute.RowReader) {
-			if err != nil {
-				return
-			}
+		b.Do(func(er execute.ColReader) error {
 			m.truncateTagsAndFields()
 			for i, col := range er.Cols() {
-				col := col
 				switch {
 				case col.Label == timeColLabel:
-					m.t = er.AtTime(0, i).Time()
+					m.t = er.Times(i)[0].Time()
 				case sort.SearchStrings(t.spec.Spec.ValueColumns, col.Label) < len(t.spec.Spec.ValueColumns): // do thing to get values
 					switch col.Type {
 					case execute.TFloat:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtFloat(0, i)})
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Floats(i)[0]})
 					case execute.TInt:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtInt(0, i)})
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Ints(i)[0]})
 					case execute.TUInt:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtUInt(0, i)})
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.UInts(i)[0]})
 					case execute.TString:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtString(0, i)})
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Strings(i)[0]})
 					case execute.TTime:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtTime(0, i)})
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Times(i)[0]})
 					case execute.TBool:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.AtBool(0, i)})
+						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Bools(i)[0]})
 					default:
 						err = errors.New("invalid type")
 					}
 				case sort.SearchStrings(t.spec.Spec.TagColumns, col.Label) < len(t.spec.Spec.TagColumns): // do thing to get tag
-					m.tags = append(m.tags, &protocol.Tag{Key: col.Label, Value: er.AtString(0, i)})
+					m.tags = append(m.tags, &protocol.Tag{Key: col.Label, Value: er.Strings(i)[0]})
 				}
 			}
+
 			_, err := e.Encode(m)
 			if err != nil {
 				fmt.Println(err)
 			}
+			return nil
 		})
 		pw.Close()
 	}()
@@ -348,7 +348,7 @@ func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block
 	if t.spec.Spec.NoKeepAlive {
 		resp, err = newOutPutClient().Do(req)
 	} else {
-		resp, err = outputHTTPKeepAliveClient.Do(req)
+		resp, err = toHTTPKeepAliveClient.Do(req)
 
 	}
 	if err != nil {
@@ -360,12 +360,12 @@ func (t *OutputHTTPTransformation) Process(id execute.DatasetID, b execute.Block
 	return req.Body.Close()
 }
 
-func (t *OutputHTTPTransformation) UpdateWatermark(id execute.DatasetID, pt execute.Time) error {
+func (t *ToHTTPTransformation) UpdateWatermark(id execute.DatasetID, pt execute.Time) error {
 	return t.d.UpdateWatermark(pt)
 }
-func (t *OutputHTTPTransformation) UpdateProcessingTime(id execute.DatasetID, pt execute.Time) error {
+func (t *ToHTTPTransformation) UpdateProcessingTime(id execute.DatasetID, pt execute.Time) error {
 	return t.d.UpdateProcessingTime(pt)
 }
-func (t *OutputHTTPTransformation) Finish(id execute.DatasetID, err error) {
+func (t *ToHTTPTransformation) Finish(id execute.DatasetID, err error) {
 	t.d.Finish(err)
 }
