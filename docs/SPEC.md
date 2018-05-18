@@ -541,7 +541,7 @@ As a result these functions return an object that represents the specific operat
 The object is then passed into the next function and added as a parent, constructing a directed acyclic graph of operations.
 The yield function then traverses the graph of operations and produces a query specification that can be executed.
 
-The following is a list of functions who's main purpose is to construct an operation.
+The following is a list of functions whose main purpose is to construct an operation.
 Details about their arguments and behavior can be found in the Operations section of this document.
 
 * count
@@ -1429,11 +1429,6 @@ As a stream consists of multiple tables each table is encoded as CSV textual dat
 CSV data should be encoded using UTF-8, and should be in Unicode Normal Form C as defined in [UAX15](https://www.w3.org/TR/2015/REC-tabular-data-model-20151217/#bib-UAX15).
 Line endings must be CRLF as defined by the `text/csv` MIME type in RFC 4180
 
-Before each table there are two header rows.
-The first declares the data types of each column, the second declares the column labels.
-
-Between each table is an empty line.
-
 Each table may have the following rows:
 
 * annotation rows - a set of rows describing properties about the columns of the table.
@@ -1452,14 +1447,32 @@ Columns support the following annotations:
 
 * datatype - a description of the type of data contained within the column.
 * partition - a boolean flag indicating if the column is part of the table's partition key.
+* default - a default value to be used for rows whose string value is the empty string.
 
+##### Multiple tables
+
+Multiple tables may be encoded into the same file or data stream.
+The table column indicates the table a row belongs to.
+All rows for a table must be contiguous.
+
+It is possible that multiple tables in the same result do not share a common table scheme.
+It is also possible that a table has no records.
+In such cases an empty row delimits a new table boundary and new annotations and header rows follow.
+The empty row acts like a delimiter between two independent CSV files that have been concatenated together.
+
+In the case were a table has no rows the `default` annotation is used to provide the values of the partition key.
+
+##### Multiple results
+
+Multiple results may be encoded into the same file or data stream.
+An empty row always delimits separate results within the same file.
+The empty row acts like a delimiter between two independent CSV files that have been concatenated together.
 
 ##### Annotations
 
 Annotations rows are prefixed with a comment marker.
 The first column contains the name of the annotation being defined.
 The subsequent columns contain the value of the annotation for the respective columns.
-
 
 The `datatype` annotation specifies the data types of the remaining columns.
 The possible data types are:
@@ -1478,7 +1491,11 @@ The possible data types are:
 The `partition` annotation specifies if the column is part of the table's partition key.
 Possible values are `true` or `false`.
 
-#### Errors
+The `default` annotation specifies a default value, if it exists, for each column.
+
+In order to fully encode a table with its partition key the `datatype`, `partition` and `default` annotations must be used.
+
+##### Errors
 
 When an error occurs during execution a table will be returned with the first column label as `error` and the second column label as `reference`.
 The error's properties are contained in the second row of the table.
@@ -1495,7 +1512,7 @@ error,reference
 Failed to parse query,897
 ```
 
-#### Dialect options
+##### Dialect options
 
 The CSV response format support the following dialect options:
 
@@ -1509,9 +1526,9 @@ The CSV response format support the following dialect options:
 | commentPrefix | CommentPrefix is a string prefix to add to comment rows. Defaults to "#". Annotations are always comment rows.                                          |
 
 
-#### Examples
+##### Examples
 
-For context the following example tables encode fictitous data in response to this query:
+For context the following example tables encode fictitious data in response to this query:
 
     from(db:"mydb")
         |> range(start:2018-05-08T20:50:00Z, stop:2018-05-08T20:51:00Z)
@@ -1538,12 +1555,9 @@ result,table,_start,_stop,_time,region,host,_value
 mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
 mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
 mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
-
-result,table,_start,_stop,_time,region,host,_value
 mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
 mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
 mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
-
 ```
 
 Example encoding with two tables in the same result with no annotations and no header row:
@@ -1552,11 +1566,9 @@ Example encoding with two tables in the same result with no annotations and no h
 mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
 mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
 mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
-
 mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
 mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
 mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
-
 ```
 
 Example encoding with two tables in the same result with the datatype annotation:
@@ -1567,13 +1579,9 @@ Example encoding with two tables in the same result with the datatype annotation
 ,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
 ,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
 ,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
-
-#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
-,result,table,_start,_stop,_time,region,host,_value
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
-
 ```
 
 Example encoding with two tables in the same result with the datatype and partition annotations:
@@ -1585,14 +1593,27 @@ Example encoding with two tables in the same result with the datatype and partit
 ,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
 ,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
 ,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
-
-#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
-#partition,false,false,true,true,false,true,false,false
-,result,table,_start,_stop,_time,region,host,_value
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,west,A,62.73
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,west,B,12.83
 ,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,west,C,51.62
+```
 
+Example encoding with two tables with differing schemas in the same result with the datatype and partition annotations:
+
+```
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#partition,false,false,true,true,false,true,false,false
+,result,table,_start,_stop,_time,region,host,_value
+,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,east,A,15.43
+,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,east,B,59.25
+,mean,0,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,east,C,52.62
+
+#datatype,string,long,dateTime:RFC3339,dateTime:RFC3339,dateTime:RFC3339,string,string,double
+#partition,false,false,true,true,false,true,false,false
+,result,table,_start,_stop,_time,location,device,min,max
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:00Z,USA,5825,62.73,68.42
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:20Z,USA,2175,12.83,56.12
+,mean,1,2018-05-08T20:50:00Z,2018-05-08T20:51:00Z,2018-05-08T20:50:40Z,USA,6913,51.62,54.25
 ```
 
 Example error encoding with the datatype annotation:
