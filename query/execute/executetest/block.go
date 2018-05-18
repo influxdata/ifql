@@ -89,19 +89,27 @@ func (cr ColReader) Times(j int) []execute.Time {
 	return []execute.Time{cr.row[j].(execute.Time)}
 }
 
-func BlocksFromCache(c execute.DataCache) []*Block {
-	var blocks []*Block
+func BlocksFromCache(c execute.DataCache) (blocks []*Block, err error) {
 	c.ForEach(func(key execute.PartitionKey) {
-		b, err := c.Block(key)
 		if err != nil {
-			panic(err)
+			return
 		}
-		blocks = append(blocks, ConvertBlock(b))
+		var b execute.Block
+		b, err = c.Block(key)
+		if err != nil {
+			return
+		}
+		var cb *Block
+		cb, err = ConvertBlock(b)
+		if err != nil {
+			return
+		}
+		blocks = append(blocks, cb)
 	})
-	return blocks
+	return blocks, nil
 }
 
-func ConvertBlock(b execute.Block) *Block {
+func ConvertBlock(b execute.Block) (*Block, error) {
 	blk := &Block{
 		ColMeta: b.Cols(),
 	}
@@ -115,7 +123,7 @@ func ConvertBlock(b execute.Block) *Block {
 		blk.KeyCols = keys
 	}
 
-	b.Do(func(cr execute.ColReader) error {
+	err := b.Do(func(cr execute.ColReader) error {
 		l := cr.Len()
 		for i := 0; i < l; i++ {
 			row := make([]interface{}, len(blk.ColMeta))
@@ -143,7 +151,10 @@ func ConvertBlock(b execute.Block) *Block {
 		}
 		return nil
 	})
-	return blk
+	if err != nil {
+		return nil, err
+	}
+	return blk, nil
 }
 
 type SortedBlocks []*Block

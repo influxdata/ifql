@@ -30,7 +30,10 @@ func ProcessTestHelper(
 		}
 	}
 
-	got := BlocksFromCache(c)
+	got, err := BlocksFromCache(c)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	sort.Sort(SortedBlocks(got))
 	sort.Sort(SortedBlocks(want))

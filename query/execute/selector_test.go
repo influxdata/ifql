@@ -190,7 +190,10 @@ func TestRowSelector_Process(t *testing.T) {
 				}
 			}
 
-			got := executetest.BlocksFromCache(c)
+			got, err := executetest.BlocksFromCache(c)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			sort.Sort(executetest.SortedBlocks(got))
 			sort.Sort(executetest.SortedBlocks(tc.want))
@@ -342,7 +345,10 @@ func TestIndexSelector_Process(t *testing.T) {
 				}
 			}
 
-			got := executetest.BlocksFromCache(c)
+			got, err := executetest.BlocksFromCache(c)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			sort.Sort(executetest.SortedBlocks(got))
 			sort.Sort(executetest.SortedBlocks(tc.want))
