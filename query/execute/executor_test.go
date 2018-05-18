@@ -29,7 +29,7 @@ func TestExecutor_Execute(t *testing.T) {
 	testCases := []struct {
 		name string
 		plan *plan.PlanSpec
-		exp  map[string][]*executetest.Block
+		want map[string][]*executetest.Block
 	}{
 		{
 			name: "simple aggregate",
@@ -82,7 +82,7 @@ func TestExecutor_Execute(t *testing.T) {
 					plan.DefaultYieldName: {ID: plan.ProcedureIDFromOperationID("sum")},
 				},
 			},
-			exp: map[string][]*executetest.Block{
+			want: map[string][]*executetest.Block{
 				plan.DefaultYieldName: []*executetest.Block{{
 					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
@@ -240,7 +240,7 @@ func TestExecutor_Execute(t *testing.T) {
 					plan.DefaultYieldName: {ID: plan.ProcedureIDFromOperationID("join")},
 				},
 			},
-			exp: map[string][]*executetest.Block{
+			want: map[string][]*executetest.Block{
 				plan.DefaultYieldName: []*executetest.Block{{
 					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
@@ -320,7 +320,7 @@ func TestExecutor_Execute(t *testing.T) {
 					"mean": {ID: plan.ProcedureIDFromOperationID("mean")},
 				},
 			},
-			exp: map[string][]*executetest.Block{
+			want: map[string][]*executetest.Block{
 				"sum": []*executetest.Block{{
 					KeyCols: []string{"_start", "_stop"},
 					ColMeta: []execute.ColMeta{
@@ -371,8 +371,15 @@ func TestExecutor_Execute(t *testing.T) {
 				}
 			}
 
-			if !cmp.Equal(got, tc.exp) {
-				t.Error("unexpected results -want/+got", cmp.Diff(tc.exp, got))
+			for _, g := range got {
+				executetest.NormalizeBlocks(g)
+			}
+			for _, w := range tc.want {
+				executetest.NormalizeBlocks(w)
+			}
+
+			if !cmp.Equal(got, tc.want) {
+				t.Error("unexpected results -want/+got", cmp.Diff(tc.want, got))
 			}
 		})
 	}
