@@ -117,7 +117,6 @@ func (t *uniqueTransformation) Process(id execute.DatasetID, b execute.Block) er
 
 	colIdx := execute.ColIdx(t.column, builder.Cols())
 	if colIdx < 0 {
-		fmt.Println("[E!] NO COLUMN")
 		return fmt.Errorf("no column %q exists", t.column)
 	}
 	col := builder.Cols()[colIdx]
