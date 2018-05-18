@@ -19,7 +19,7 @@ func TestToHTTP_NewQuery(t *testing.T) {
 	tests := []querytest.NewQueryTestCase{
 		{
 			Name: "from with database with range",
-			Raw:  `from(db:"mydb") |> outputHTTP(addr: "https://localhost:8081", name:"series1", method:"POST",  timeout: 50s)`,
+			Raw:  `from(db:"mydb") |> toHTTP(addr: "https://localhost:8081", name:"series1", method:"POST",  timeout: 50s)`,
 			Want: &query.Spec{
 				Operations: []*query.Operation{
 					{
@@ -29,7 +29,7 @@ func TestToHTTP_NewQuery(t *testing.T) {
 						},
 					},
 					{
-						ID: "outputHTTP1",
+						ID: "toHTTP1",
 						Spec: &functions.ToHTTPOpSpec{
 							Addr:         "https://localhost:8081",
 							Name:         "series1",
@@ -37,12 +37,15 @@ func TestToHTTP_NewQuery(t *testing.T) {
 							Timeout:      50 * time.Second,
 							TimeColumn:   execute.DefaultTimeColLabel,
 							ValueColumns: []string{execute.DefaultValueColLabel},
-							Headers:      map[string]string{"Content-Type": "application/vnd.influx"},
+							Headers: map[string]string{
+								"Content-Type": "application/vnd.influx",
+								"User-Agent":   "ifqld/dev",
+							},
 						},
 					},
 				},
 				Edges: []query.Edge{
-					{Parent: "from0", Child: "outputHTTP1"},
+					{Parent: "from0", Child: "toHTTP1"},
 				},
 			},
 		},
@@ -75,8 +78,8 @@ func TestToHTTPOpSpec_UnmarshalJSON(t *testing.T) {
 			name: "happy path",
 			bytes: []byte(`
 			{
-				"id": "outputHTTP",
-				"kind": "outputHTTP",
+				"id": "toHTTP",
+				"kind": "toHTTP",
 				"spec": {
 				  "addr": "https://localhost:8081",
 				  "method" :"POST"
@@ -90,8 +93,8 @@ func TestToHTTPOpSpec_UnmarshalJSON(t *testing.T) {
 			name: "bad address",
 			bytes: []byte(`
 		{
-			"id": "outputHTTP",
-			"kind": "outputHTTP",
+			"id": "toHTTP",
+			"kind": "toHTTP",
 			"spec": {
 			  "addr": "https://loc	alhost:8081",
 			  "method" :"POST"
@@ -114,7 +117,7 @@ func TestToHTTPOpSpec_UnmarshalJSON(t *testing.T) {
 				NoKeepAlive: tt.fields.NoKeepAlive,
 			}
 			op := &query.Operation{
-				ID:   "outputHTTP",
+				ID:   "toHTTP",
 				Spec: o,
 			}
 			if !tt.wantErr {
