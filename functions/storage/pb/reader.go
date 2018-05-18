@@ -91,9 +91,9 @@ func (bi *bockIterator) Do(f func(execute.Block) error) error {
 	req.TimestampRange.End = int64(bi.bounds.Stop)
 	req.Grouping = bi.readSpec.GroupKeys
 
-	req.SeriesLimit = uint64(bi.readSpec.SeriesLimit)
-	req.PointsLimit = uint64(bi.readSpec.PointsLimit)
-	req.SeriesOffset = uint64(bi.readSpec.SeriesOffset)
+	req.SeriesLimit = bi.readSpec.SeriesLimit
+	req.PointsLimit = bi.readSpec.PointsLimit
+	req.SeriesOffset = bi.readSpec.SeriesOffset
 	req.Trace = bi.trace
 
 	if agg, err := determineAggregateMethod(bi.readSpec.AggregateMethod); err != nil {
@@ -239,6 +239,15 @@ func partitionKeyForSeries(s *ReadResponse_SeriesFrame, readSpec *storage.ReadSp
 			})
 			values = append(values, string(tag.Value))
 		}
+	} else if !readSpec.MergeAll {
+		for _, tag := range s.Tags {
+			cols = append(cols, execute.ColMeta{
+				Label: string(tag.Key),
+				Type:  execute.TString,
+			})
+			values = append(values, string(tag.Value))
+		}
+
 	}
 	return execute.NewPartitionKey(cols, values)
 }
@@ -274,6 +283,8 @@ type block struct {
 	uintBuf   []uint64
 	floatBuf  []float64
 	stringBuf []string
+
+	err error
 }
 
 func newBlock(
@@ -302,6 +313,8 @@ func (b *block) RefCount(n int) {
 	//TODO(nathanielc): Have the storageBlock consume the Allocator,
 	// once we have zero-copy serialization over the network
 }
+
+func (b *block) Err() error { return b.err }
 
 func (b *block) wait() {
 	<-b.done
@@ -388,8 +401,15 @@ func (b *block) advance() bool {
 
 			// Advance to next frame
 			b.ms.next()
+
+			if b.readSpec.PointsLimit == -1 {
+				// do not expect points frames
+				b.l = 0
+				return true
+			}
 		case boolPointsType:
 			if b.cols[valueColIdx].Type != execute.TBool {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TBool)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -421,6 +441,7 @@ func (b *block) advance() bool {
 			return true
 		case intPointsType:
 			if b.cols[valueColIdx].Type != execute.TInt {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TInt)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -452,6 +473,7 @@ func (b *block) advance() bool {
 			return true
 		case uintPointsType:
 			if b.cols[valueColIdx].Type != execute.TUInt {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TUInt)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -483,6 +505,7 @@ func (b *block) advance() bool {
 			return true
 		case floatPointsType:
 			if b.cols[valueColIdx].Type != execute.TFloat {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TFloat)
 				// TODO: Add error handling
 				// Type changed,
 				return false
@@ -515,6 +538,7 @@ func (b *block) advance() bool {
 			return true
 		case stringPointsType:
 			if b.cols[valueColIdx].Type != execute.TString {
+				b.err = fmt.Errorf("value type changed from %s -> %s", b.cols[valueColIdx].Type, execute.TString)
 				// TODO: Add error handling
 				// Type changed,
 				return false

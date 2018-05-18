@@ -233,11 +233,11 @@ func (t *groupTransformation) RetractBlock(id execute.DatasetID, key execute.Par
 func (t *groupTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	cols := b.Cols()
 	on := make(map[string]bool, len(cols))
-	if !t.ignoring {
+	if len(t.keys) > 0 {
 		for _, k := range t.keys {
 			on[k] = true
 		}
-	} else {
+	} else if len(t.except) > 0 {
 	COLS:
 		for _, c := range cols {
 			for _, label := range t.except {

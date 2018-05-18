@@ -10,23 +10,23 @@ import (
 	"github.com/influxdata/ifql/query/querytest"
 )
 
-func TestDistinctOperation_Marshaling(t *testing.T) {
-	data := []byte(`{"id":"distinct","kind":"distinct","spec":{"column":"_value"}}`)
+func TestUniqueOperation_Marshaling(t *testing.T) {
+	data := []byte(`{"id":"unique","kind":"unique","spec":{"column":"_value"}}`)
 	op := &query.Operation{
-		ID: "distinct",
-		Spec: &functions.DistinctOpSpec{
+		ID: "unique",
+		Spec: &functions.UniqueOpSpec{
 			Column: "_value",
 		},
 	}
 	querytest.OperationMarshalingTestHelper(t, data, op)
 }
 
-func TestDistinct_PassThrough(t *testing.T) {
+func TestUnique_PassThrough(t *testing.T) {
 	executetest.TransformationPassThroughTestHelper(t, func(d execute.Dataset, c execute.BlockBuilderCache) execute.Transformation {
-		s := functions.NewDistinctTransformation(
+		s := functions.NewUniqueTransformation(
 			d,
 			c,
-			&functions.DistinctProcedureSpec{
+			&functions.UniqueProcedureSpec{
 				Column: "_value",
 			},
 		)
@@ -34,16 +34,16 @@ func TestDistinct_PassThrough(t *testing.T) {
 	})
 }
 
-func TestDistinct_Process(t *testing.T) {
+func TestUnique_Process(t *testing.T) {
 	testCases := []struct {
 		name string
-		spec *functions.DistinctProcedureSpec
+		spec *functions.UniqueProcedureSpec
 		data []execute.Block
 		want []*executetest.Block
 	}{
 		{
 			name: "one block",
-			spec: &functions.DistinctProcedureSpec{
+			spec: &functions.UniqueProcedureSpec{
 				Column: "_value",
 			},
 			data: []execute.Block{&executetest.Block{
@@ -71,8 +71,8 @@ func TestDistinct_Process(t *testing.T) {
 			}},
 		},
 		{
-			name: "distinct tag",
-			spec: &functions.DistinctProcedureSpec{
+			name: "unique tag",
+			spec: &functions.UniqueProcedureSpec{
 				Column: "t1",
 			},
 			data: []execute.Block{&executetest.Block{
@@ -102,8 +102,8 @@ func TestDistinct_Process(t *testing.T) {
 			}},
 		},
 		{
-			name: "distinct times",
-			spec: &functions.DistinctProcedureSpec{
+			name: "unique times",
+			spec: &functions.UniqueProcedureSpec{
 				Column: "_time",
 			},
 			data: []execute.Block{&executetest.Block{
@@ -141,7 +141,7 @@ func TestDistinct_Process(t *testing.T) {
 				tc.data,
 				tc.want,
 				func(d execute.Dataset, c execute.BlockBuilderCache) execute.Transformation {
-					return functions.NewDistinctTransformation(d, c, tc.spec)
+					return functions.NewUniqueTransformation(d, c, tc.spec)
 				},
 			)
 		})

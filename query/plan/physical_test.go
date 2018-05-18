@@ -489,6 +489,311 @@ func TestPhysicalPlanner_Plan(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "group with distinct on tag",
+			lp: &plan.LogicalPlanSpec{
+				Resources: query.ResourceManagement{
+					ConcurrencyQuota: 1,
+					MemoryBytesQuota: 10000,
+				},
+				Procedures: map[plan.ProcedureID]*plan.Procedure{
+					plan.ProcedureIDFromOperationID("from"): {
+						ID: plan.ProcedureIDFromOperationID("from"),
+						Spec: &functions.FromProcedureSpec{
+							Database: "mydb",
+						},
+						Parents:  nil,
+						Children: []plan.ProcedureID{plan.ProcedureIDFromOperationID("range")},
+					},
+					plan.ProcedureIDFromOperationID("range"): {
+						ID: plan.ProcedureIDFromOperationID("range"),
+						Spec: &functions.RangeProcedureSpec{
+							Bounds: plan.BoundsSpec{
+								Start: query.Time{
+									IsRelative: true,
+									Relative:   -1 * time.Hour,
+								},
+							},
+						},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("from")},
+						Children: []plan.ProcedureID{
+							plan.ProcedureIDFromOperationID("group"),
+						},
+					},
+					plan.ProcedureIDFromOperationID("group"): {
+						ID: plan.ProcedureIDFromOperationID("group"),
+						Spec: &functions.GroupProcedureSpec{
+							By: []string{"host"},
+						},
+						Parents:  []plan.ProcedureID{plan.ProcedureIDFromOperationID("range")},
+						Children: []plan.ProcedureID{plan.ProcedureIDFromOperationID("distinct")},
+					},
+					plan.ProcedureIDFromOperationID("distinct"): {
+						ID: plan.ProcedureIDFromOperationID("distinct"),
+						Spec: &functions.DistinctProcedureSpec{
+							Column: "host",
+						},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("group")},
+					},
+				},
+				Order: []plan.ProcedureID{
+					plan.ProcedureIDFromOperationID("from"),
+					plan.ProcedureIDFromOperationID("range"),
+					plan.ProcedureIDFromOperationID("group"),
+					plan.ProcedureIDFromOperationID("distinct"),
+				},
+			},
+			pp: &plan.PlanSpec{
+				Now: time.Date(2017, 8, 8, 0, 0, 0, 0, time.UTC),
+				Resources: query.ResourceManagement{
+					ConcurrencyQuota: 1,
+					MemoryBytesQuota: 10000,
+				},
+				Bounds: plan.BoundsSpec{
+					Start: query.Time{
+						IsRelative: true,
+						Relative:   -1 * time.Hour,
+					},
+				},
+				Procedures: map[plan.ProcedureID]*plan.Procedure{
+					plan.ProcedureIDFromOperationID("from"): {
+						ID: plan.ProcedureIDFromOperationID("from"),
+						Spec: &functions.FromProcedureSpec{
+							Database:  "mydb",
+							BoundsSet: true,
+							Bounds: plan.BoundsSpec{
+								Start: query.Time{
+									IsRelative: true,
+									Relative:   -1 * time.Hour,
+								},
+							},
+							GroupingSet: true,
+							GroupKeys:   []string{"host"},
+							LimitSet:    true,
+							PointsLimit: -1,
+						},
+						Parents: nil,
+						Children: []plan.ProcedureID{
+							plan.ProcedureIDFromOperationID("distinct"),
+						},
+					},
+					plan.ProcedureIDFromOperationID("distinct"): {
+						ID:      plan.ProcedureIDFromOperationID("distinct"),
+						Spec:    &functions.DistinctProcedureSpec{Column: "host"},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("from")},
+					},
+				},
+				Results: map[string]plan.YieldSpec{
+					"_result": {ID: plan.ProcedureIDFromOperationID("distinct")},
+				},
+				Order: []plan.ProcedureID{
+					plan.ProcedureIDFromOperationID("from"),
+					plan.ProcedureIDFromOperationID("distinct"),
+				},
+			},
+		},
+		{
+			name: "group with distinct on _value does not optimize",
+			lp: &plan.LogicalPlanSpec{
+				Resources: query.ResourceManagement{
+					ConcurrencyQuota: 1,
+					MemoryBytesQuota: 10000,
+				},
+				Procedures: map[plan.ProcedureID]*plan.Procedure{
+					plan.ProcedureIDFromOperationID("from"): {
+						ID: plan.ProcedureIDFromOperationID("from"),
+						Spec: &functions.FromProcedureSpec{
+							Database: "mydb",
+						},
+						Parents:  nil,
+						Children: []plan.ProcedureID{plan.ProcedureIDFromOperationID("range")},
+					},
+					plan.ProcedureIDFromOperationID("range"): {
+						ID: plan.ProcedureIDFromOperationID("range"),
+						Spec: &functions.RangeProcedureSpec{
+							Bounds: plan.BoundsSpec{
+								Start: query.Time{
+									IsRelative: true,
+									Relative:   -1 * time.Hour,
+								},
+							},
+						},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("from")},
+						Children: []plan.ProcedureID{
+							plan.ProcedureIDFromOperationID("group"),
+						},
+					},
+					plan.ProcedureIDFromOperationID("group"): {
+						ID: plan.ProcedureIDFromOperationID("group"),
+						Spec: &functions.GroupProcedureSpec{
+							By: []string{"host"},
+						},
+						Parents:  []plan.ProcedureID{plan.ProcedureIDFromOperationID("range")},
+						Children: []plan.ProcedureID{plan.ProcedureIDFromOperationID("distinct")},
+					},
+					plan.ProcedureIDFromOperationID("distinct"): {
+						ID: plan.ProcedureIDFromOperationID("distinct"),
+						Spec: &functions.DistinctProcedureSpec{
+							Column: "_value",
+						},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("group")},
+					},
+				},
+				Order: []plan.ProcedureID{
+					plan.ProcedureIDFromOperationID("from"),
+					plan.ProcedureIDFromOperationID("range"),
+					plan.ProcedureIDFromOperationID("group"),
+					plan.ProcedureIDFromOperationID("distinct"),
+				},
+			},
+			pp: &plan.PlanSpec{
+				Now: time.Date(2017, 8, 8, 0, 0, 0, 0, time.UTC),
+				Resources: query.ResourceManagement{
+					ConcurrencyQuota: 1,
+					MemoryBytesQuota: 10000,
+				},
+				Bounds: plan.BoundsSpec{
+					Start: query.Time{
+						IsRelative: true,
+						Relative:   -1 * time.Hour,
+					},
+				},
+				Procedures: map[plan.ProcedureID]*plan.Procedure{
+					plan.ProcedureIDFromOperationID("from"): {
+						ID: plan.ProcedureIDFromOperationID("from"),
+						Spec: &functions.FromProcedureSpec{
+							Database:  "mydb",
+							BoundsSet: true,
+							Bounds: plan.BoundsSpec{
+								Start: query.Time{
+									IsRelative: true,
+									Relative:   -1 * time.Hour,
+								},
+							},
+							GroupingSet: true,
+							GroupKeys:   []string{"host"},
+						},
+						Parents: nil,
+						Children: []plan.ProcedureID{
+							plan.ProcedureIDFromOperationID("distinct"),
+						},
+					},
+					plan.ProcedureIDFromOperationID("distinct"): {
+						ID:      plan.ProcedureIDFromOperationID("distinct"),
+						Spec:    &functions.DistinctProcedureSpec{Column: "_value"},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("from")},
+					},
+				},
+				Results: map[string]plan.YieldSpec{
+					"_result": {ID: plan.ProcedureIDFromOperationID("distinct")},
+				},
+				Order: []plan.ProcedureID{
+					plan.ProcedureIDFromOperationID("from"),
+					plan.ProcedureIDFromOperationID("distinct"),
+				},
+			},
+		},
+		{
+			name: "group with distinct on non-grouped does not optimize",
+			lp: &plan.LogicalPlanSpec{
+				Resources: query.ResourceManagement{
+					ConcurrencyQuota: 1,
+					MemoryBytesQuota: 10000,
+				},
+				Procedures: map[plan.ProcedureID]*plan.Procedure{
+					plan.ProcedureIDFromOperationID("from"): {
+						ID: plan.ProcedureIDFromOperationID("from"),
+						Spec: &functions.FromProcedureSpec{
+							Database: "mydb",
+						},
+						Parents:  nil,
+						Children: []plan.ProcedureID{plan.ProcedureIDFromOperationID("range")},
+					},
+					plan.ProcedureIDFromOperationID("range"): {
+						ID: plan.ProcedureIDFromOperationID("range"),
+						Spec: &functions.RangeProcedureSpec{
+							Bounds: plan.BoundsSpec{
+								Start: query.Time{
+									IsRelative: true,
+									Relative:   -1 * time.Hour,
+								},
+							},
+						},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("from")},
+						Children: []plan.ProcedureID{
+							plan.ProcedureIDFromOperationID("group"),
+						},
+					},
+					plan.ProcedureIDFromOperationID("group"): {
+						ID: plan.ProcedureIDFromOperationID("group"),
+						Spec: &functions.GroupProcedureSpec{
+							By: []string{"host"},
+						},
+						Parents:  []plan.ProcedureID{plan.ProcedureIDFromOperationID("range")},
+						Children: []plan.ProcedureID{plan.ProcedureIDFromOperationID("distinct")},
+					},
+					plan.ProcedureIDFromOperationID("distinct"): {
+						ID: plan.ProcedureIDFromOperationID("distinct"),
+						Spec: &functions.DistinctProcedureSpec{
+							Column: "region",
+						},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("group")},
+					},
+				},
+				Order: []plan.ProcedureID{
+					plan.ProcedureIDFromOperationID("from"),
+					plan.ProcedureIDFromOperationID("range"),
+					plan.ProcedureIDFromOperationID("group"),
+					plan.ProcedureIDFromOperationID("distinct"),
+				},
+			},
+			pp: &plan.PlanSpec{
+				Now: time.Date(2017, 8, 8, 0, 0, 0, 0, time.UTC),
+				Resources: query.ResourceManagement{
+					ConcurrencyQuota: 1,
+					MemoryBytesQuota: 10000,
+				},
+				Bounds: plan.BoundsSpec{
+					Start: query.Time{
+						IsRelative: true,
+						Relative:   -1 * time.Hour,
+					},
+				},
+				Procedures: map[plan.ProcedureID]*plan.Procedure{
+					plan.ProcedureIDFromOperationID("from"): {
+						ID: plan.ProcedureIDFromOperationID("from"),
+						Spec: &functions.FromProcedureSpec{
+							Database:  "mydb",
+							BoundsSet: true,
+							Bounds: plan.BoundsSpec{
+								Start: query.Time{
+									IsRelative: true,
+									Relative:   -1 * time.Hour,
+								},
+							},
+							GroupingSet: true,
+							GroupKeys:   []string{"host"},
+						},
+						Parents: nil,
+						Children: []plan.ProcedureID{
+							plan.ProcedureIDFromOperationID("distinct"),
+						},
+					},
+					plan.ProcedureIDFromOperationID("distinct"): {
+						ID:      plan.ProcedureIDFromOperationID("distinct"),
+						Spec:    &functions.DistinctProcedureSpec{Column: "region"},
+						Parents: []plan.ProcedureID{plan.ProcedureIDFromOperationID("from")},
+					},
+				},
+				Results: map[string]plan.YieldSpec{
+					"_result": {ID: plan.ProcedureIDFromOperationID("distinct")},
+				},
+				Order: []plan.ProcedureID{
+					plan.ProcedureIDFromOperationID("from"),
+					plan.ProcedureIDFromOperationID("distinct"),
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		tc := tc

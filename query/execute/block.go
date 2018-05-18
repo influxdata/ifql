@@ -298,6 +298,9 @@ type Block interface {
 	// RefCount modifies the reference count on the block by n.
 	// When the RefCount goes to zero, the block is freed.
 	RefCount(n int)
+
+	// Err returns any errors whilst processing the block.
+	Err() error
 }
 
 // OneTimeBlock is a Block that permits reading data only once.
@@ -858,6 +861,8 @@ type ColListBlock struct {
 
 	refCount int32
 }
+
+func (b *ColListBlock) Err() error { return nil }
 
 func (b *ColListBlock) RefCount(n int) {
 	c := atomic.AddInt32(&b.refCount, int32(n))
