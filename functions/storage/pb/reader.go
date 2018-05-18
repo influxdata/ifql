@@ -336,7 +336,7 @@ func (b *block) Do(f func(execute.ColReader) error) error {
 			return err
 		}
 	}
-	return nil
+	return b.err
 }
 
 func (b *block) Len() int {
