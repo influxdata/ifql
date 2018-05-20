@@ -173,9 +173,6 @@ func createToHTTPOpSpec(args query.Arguments, a *query.Administration) (query.Op
 	if err := s.ReadArgs(args); err != nil {
 		return nil, err
 	}
-	// if err := s.AggregateConfig.ReadArgs(args); err != nil {
-	// 	return s, err
-	// }
 	return s, nil
 }
 

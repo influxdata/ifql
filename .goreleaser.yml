@@ -19,7 +19,7 @@ builds:
       goarch: 386
   main: ./cmd/ifqld/main.go
   ldflags: -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} \
-    -X functions.DefaultToHTTPTimeout='lfqld/{{.Version}}'
+    -X functions.DefaultToHTTPUserAgent='lfqld/{{.Version}}'
   binary: ifqld
 archive:
   format: tar.gz
