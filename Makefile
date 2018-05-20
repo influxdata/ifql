@@ -50,7 +50,7 @@ bin/goreleaser:
 	go build -i -o bin/goreleaser ./vendor/github.com/goreleaser/goreleaser
 
 dist: bin/goreleaser
-	PATH=./bin:${PATH} goreleaser --rm-dist --release-notes CHANGELOG.md --skip-validate --skip-publish
+	PATH=./bin:${PATH} goreleaser --rm-dist --release-notes CHANGELOG.md
 
 release: dist release-docker
 

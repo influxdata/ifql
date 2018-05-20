@@ -152,6 +152,100 @@ func TestToHTTP_Process(t *testing.T) {
 		want wanted
 	}{
 		{
+			name: "colblock with name in _measurement",
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
+					Addr:         server.URL,
+					Method:       "GET",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.DefaultTimeColLabel,
+					ValueColumns: []string{"_value"},
+					NameColumn:   "_measurement",
+				},
+			},
+			data: []execute.Block{execute.CopyBlock(&executetest.Block{
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_measurement", Type: execute.TString},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "fred", Type: execute.TString},
+				},
+				Data: [][]interface{}{
+					{execute.Time(11), "a", 2.0, "one"},
+					{execute.Time(21), "a", 2.0, "one"},
+					{execute.Time(21), "b", 1.0, "seven"},
+					{execute.Time(31), "a", 3.0, "nine"},
+					{execute.Time(41), "c", 4.0, "elevendyone"},
+				},
+			}, executetest.UnlimitedAllocator)},
+			want: wanted{
+				Block:  []*executetest.Block(nil),
+				Result: []byte("a _value=2 11\na _value=2 21\nb _value=1 21\na _value=3 31\nc _value=4 41\n")},
+		},
+		{
+			name: "one block with measurement name in _measurement",
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
+					Addr:         server.URL,
+					Method:       "GET",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.DefaultTimeColLabel,
+					ValueColumns: []string{"_value"},
+					NameColumn:   "_measurement",
+				},
+			},
+			data: []execute.Block{&executetest.Block{
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_measurement", Type: execute.TString},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "fred", Type: execute.TString},
+				},
+				Data: [][]interface{}{
+					{execute.Time(11), "a", 2.0, "one"},
+					{execute.Time(21), "a", 2.0, "one"},
+					{execute.Time(21), "b", 1.0, "seven"},
+					{execute.Time(31), "a", 3.0, "nine"},
+					{execute.Time(41), "c", 4.0, "elevendyone"},
+				},
+			}},
+			want: wanted{
+				Block:  []*executetest.Block(nil),
+				Result: []byte("a _value=2 11\na _value=2 21\nb _value=1 21\na _value=3 31\nc _value=4 41\n")},
+		},
+		{
+			name: "one block with measurement name in _measurement and tag",
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
+					Addr:         server.URL,
+					Method:       "GET",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.DefaultTimeColLabel,
+					ValueColumns: []string{"_value"},
+					TagColumns:   []string{"fred"},
+					NameColumn:   "_measurement",
+				},
+			},
+			data: []execute.Block{&executetest.Block{
+				ColMeta: []execute.ColMeta{
+					{Label: "_time", Type: execute.TTime},
+					{Label: "_measurement", Type: execute.TString},
+					{Label: "_value", Type: execute.TFloat},
+					{Label: "fred", Type: execute.TString},
+				},
+				Data: [][]interface{}{
+					{execute.Time(11), "a", 2.0, "one"},
+					{execute.Time(21), "a", 2.0, "one"},
+					{execute.Time(21), "b", 1.0, "seven"},
+					{execute.Time(31), "a", 3.0, "nine"},
+					{execute.Time(41), "c", 4.0, "elevendyone"},
+				},
+			}},
+			want: wanted{
+				Block:  []*executetest.Block(nil),
+				Result: []byte("a,fred=one _value=2 11\na,fred=one _value=2 21\nb,fred=seven _value=1 21\na,fred=nine _value=3 31\nc,fred=elevendyone _value=4 41\n")},
+		},
+		{
 			name: "one block",
 			spec: &functions.ToHTTPProcedureSpec{
 				Spec: &functions.ToHTTPOpSpec{
@@ -292,6 +386,52 @@ one_block_w_tag,fred=elevendyone _value=4 41
 				Block: []*executetest.Block(nil),
 				Result: []byte("multi_block,fred=one _value=2 11\nmulti_block,fred=seven _value=1 21\nmulti_block,fred=nine _value=3 31\n" +
 					"multi_block,fred=one _value=2 51\nmulti_block,fred=seven _value=1 61\nmulti_block,fred=nine _value=3 71\n"),
+			},
+		},
+		{
+			name: "multi collist blocks",
+			spec: &functions.ToHTTPProcedureSpec{
+				Spec: &functions.ToHTTPOpSpec{
+					Addr:         server.URL,
+					Method:       "GET",
+					Timeout:      50 * time.Second,
+					TimeColumn:   execute.DefaultTimeColLabel,
+					ValueColumns: []string{"_value"},
+					TagColumns:   []string{"fred"},
+					Name:         "multi_collist_blocks",
+				},
+			},
+			data: []execute.Block{
+				execute.CopyBlock(
+					&executetest.Block{
+						ColMeta: []execute.ColMeta{
+							{Label: "_time", Type: execute.TTime},
+							{Label: "_value", Type: execute.TFloat},
+							{Label: "fred", Type: execute.TString},
+						},
+						Data: [][]interface{}{
+							{execute.Time(11), 2.0, "one"},
+							{execute.Time(21), 1.0, "seven"},
+							{execute.Time(31), 3.0, "nine"},
+						},
+					}, executetest.UnlimitedAllocator),
+				&executetest.Block{
+					ColMeta: []execute.ColMeta{
+						{Label: "_time", Type: execute.TTime},
+						{Label: "_value", Type: execute.TFloat},
+						{Label: "fred", Type: execute.TString},
+					},
+					Data: [][]interface{}{
+						{execute.Time(51), 2.0, "one"},
+						{execute.Time(61), 1.0, "seven"},
+						{execute.Time(71), 3.0, "nine"},
+					},
+				},
+			},
+			want: wanted{
+				Block: []*executetest.Block(nil),
+				Result: []byte("multi_collist_blocks,fred=one _value=2 11\nmulti_collist_blocks,fred=seven _value=1 21\nmulti_collist_blocks,fred=nine _value=3 31\n" +
+					"multi_collist_blocks,fred=one _value=2 51\nmulti_collist_blocks,fred=seven _value=1 61\nmulti_collist_blocks,fred=nine _value=3 71\n"),
 			},
 		},
 	}

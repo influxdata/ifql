@@ -29,7 +29,7 @@ const (
 // DefaultToHTTPUserAgent is the default user agent used by ToHttp
 var DefaultToHTTPUserAgent = "ifqld/dev"
 
-func newOutPutClient() *http.Client {
+func newToHTTPClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
@@ -47,7 +47,7 @@ func newOutPutClient() *http.Client {
 	}
 }
 
-var toHTTPKeepAliveClient = newOutPutClient()
+var toHTTPKeepAliveClient = newToHTTPClient()
 
 // this is used so we can get better validation on marshaling, innerToHTTPOpSpec and ToHTTPOpSpec
 // need to have identical fields
@@ -57,9 +57,10 @@ type ToHTTPOpSpec struct {
 	Addr         string            `json:"addr"`
 	Method       string            `json:"method"` // default behavior should be POST
 	Name         string            `json:"name"`
-	Headers      map[string]string `json:"headers"`   // TODO: implement Headers after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
-	URLParams    map[string]string `json:"urlparams"` // TODO: implement URLParams after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
-	Timeout      time.Duration     `json:"timeout"`   // default to something reasonable if zero
+	NameColumn   string            `json:"name_column"` // either name or name_column must be set, if none is set try to use the "_measurement" column.
+	Headers      map[string]string `json:"headers"`     // TODO: implement Headers after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
+	URLParams    map[string]string `json:"urlparams"`   // TODO: implement URLParams after bug with keys and arrays and objects is fixed (new parser implemented, with string literals as keys)
+	Timeout      time.Duration     `json:"timeout"`     // default to something reasonable if zero
 	NoKeepAlive  bool              `json:"nokeepalive"`
 	TimeColumn   string            `json:"time_column"`
 	TagColumns   []string          `json:"tag_columns"`
@@ -85,12 +86,21 @@ func (o *ToHTTPOpSpec) ReadArgs(args query.Arguments) error {
 		return err
 	}
 
-	o.Name, err = args.GetRequiredString("name")
+	var ok bool
+	o.Name, ok, err = args.GetString("name")
 	if err != nil {
 		return err
 	}
+	if !ok {
+		o.NameColumn, ok, err = args.GetString("name_column")
+		if err != nil {
+			return err
+		}
+		if !ok {
+			o.NameColumn = "_measurement"
+		}
+	}
 
-	var ok bool
 	o.Method, ok, err = args.GetString("method")
 	if err != nil {
 		return err
@@ -241,33 +251,35 @@ func NewToHTTPTransformation(d execute.Dataset, cache execute.BlockBuilderCache,
 	}
 }
 
-type httpOutputMetric struct {
+type toHttpMetric struct {
 	tags   []*protocol.Tag
 	fields []*protocol.Field
 	name   string
 	t      time.Time
 }
 
-func (m *httpOutputMetric) TagList() []*protocol.Tag {
+func (m *toHttpMetric) TagList() []*protocol.Tag {
 	return m.tags
 }
-func (m *httpOutputMetric) FieldList() []*protocol.Field {
+func (m *toHttpMetric) FieldList() []*protocol.Field {
 	return m.fields
 }
 
-func (m *httpOutputMetric) truncateTagsAndFields() {
+func (m *toHttpMetric) truncateTagsAndFields() {
 	m.fields = m.fields[:0]
 	m.tags = m.tags[:0]
 
 }
 
-func (m *httpOutputMetric) Name() string {
+func (m *toHttpMetric) Name() string {
 	return m.name
 }
 
-func (m *httpOutputMetric) Time() time.Time {
+func (m *toHttpMetric) Time() time.Time {
 	return m.t
 }
+
+// setCols must be called after
 
 type idxType struct {
 	Idx  int
@@ -276,7 +288,7 @@ type idxType struct {
 
 func (t *ToHTTPTransformation) Process(id execute.DatasetID, b execute.Block) error {
 	pr, pw := io.Pipe() // TODO: replce the pipe with something faster
-	m := &httpOutputMetric{}
+	m := &toHttpMetric{}
 	e := protocol.NewEncoder(pw)
 	e.FailOnFieldErr(true)
 	e.SetFieldSortOrder(protocol.SortFields)
@@ -285,49 +297,77 @@ func (t *ToHTTPTransformation) Process(id execute.DatasetID, b execute.Block) er
 	for i, col := range cols {
 		labels[col.Label] = idxType{Idx: i, Type: col.Type}
 	}
+
 	// do time
 	timeColLabel := t.spec.Spec.TimeColumn
 	timeColIdx, ok := labels[timeColLabel]
+
 	if !ok {
 		return errors.New("Could not get time column")
 	}
 	if timeColIdx.Type != execute.TTime {
 		return fmt.Errorf("column %s is not of type %s", timeColLabel, timeColIdx.Type)
 	}
+	var measurementNameCol string
+	if t.spec.Spec.Name == "" {
+		measurementNameCol = t.spec.Spec.NameColumn
+	}
+
+	// check if each col is a tag or value and cache this value for the loop
+	colMetadatas := b.Cols()
+	isTag := make([]bool, len(colMetadatas))
+	isValue := make([]bool, len(colMetadatas))
+
+	for i, col := range colMetadatas {
+		isValue[i] = sort.SearchStrings(t.spec.Spec.ValueColumns, col.Label) < len(t.spec.Spec.ValueColumns) && t.spec.Spec.ValueColumns[sort.SearchStrings(t.spec.Spec.ValueColumns, col.Label)] == col.Label
+		isTag[i] = sort.SearchStrings(t.spec.Spec.TagColumns, col.Label) < len(t.spec.Spec.TagColumns) && t.spec.Spec.TagColumns[sort.SearchStrings(t.spec.Spec.TagColumns, col.Label)] == col.Label
+	}
+
 	var err error
 	go func() {
 		m.name = t.spec.Spec.Name
 		b.Do(func(er execute.ColReader) error {
-			m.truncateTagsAndFields()
-			for i, col := range er.Cols() {
-				switch {
-				case col.Label == timeColLabel:
-					m.t = er.Times(i)[0].Time()
-				case sort.SearchStrings(t.spec.Spec.ValueColumns, col.Label) < len(t.spec.Spec.ValueColumns): // do thing to get values
-					switch col.Type {
-					case execute.TFloat:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Floats(i)[0]})
-					case execute.TInt:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Ints(i)[0]})
-					case execute.TUInt:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.UInts(i)[0]})
-					case execute.TString:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Strings(i)[0]})
-					case execute.TTime:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Times(i)[0]})
-					case execute.TBool:
-						m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Bools(i)[0]})
-					default:
-						err = errors.New("invalid type")
-					}
-				case sort.SearchStrings(t.spec.Spec.TagColumns, col.Label) < len(t.spec.Spec.TagColumns): // do thing to get tag
-					m.tags = append(m.tags, &protocol.Tag{Key: col.Label, Value: er.Strings(i)[0]})
-				}
-			}
+			l := er.Len()
+			for i := 0; i < l; i++ {
+				m.truncateTagsAndFields()
+				for j, col := range er.Cols() {
+					switch {
+					case col.Label == timeColLabel:
+						m.t = er.Times(j)[i].Time()
+					case measurementNameCol != "" && measurementNameCol == col.Label:
+						if col.Type != execute.TString {
+							return errors.New("invalid type for measurement column")
+						}
+						m.name = er.Strings(j)[i]
+					case isTag[j]:
+						if col.Type != execute.TString {
+							return errors.New("invalid type for measurement column")
+						}
+						m.tags = append(m.tags, &protocol.Tag{Key: col.Label, Value: er.Strings(j)[i]})
 
-			_, err := e.Encode(m)
-			if err != nil {
-				fmt.Println(err)
+					case isValue[j]:
+						switch col.Type {
+						case execute.TFloat:
+							m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Floats(j)[i]})
+						case execute.TInt:
+							m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Ints(j)[i]})
+						case execute.TUInt:
+							m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.UInts(j)[i]})
+						case execute.TString:
+							m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Strings(j)[i]})
+						case execute.TTime:
+							m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Times(j)[i]})
+						case execute.TBool:
+							m.fields = append(m.fields, &protocol.Field{Key: col.Label, Value: er.Bools(j)[i]})
+						default:
+							return fmt.Errorf("invalid type for column %s", col.Label)
+						}
+					}
+				}
+				_, err := e.Encode(m)
+				if err != nil {
+					return err
+				}
 			}
 			return nil
 		})
@@ -346,7 +386,7 @@ func (t *ToHTTPTransformation) Process(id execute.DatasetID, b execute.Block) er
 	}
 	var resp *http.Response
 	if t.spec.Spec.NoKeepAlive {
-		resp, err = newOutPutClient().Do(req)
+		resp, err = newToHTTPClient().Do(req)
 	} else {
 		resp, err = toHTTPKeepAliveClient.Do(req)
 
