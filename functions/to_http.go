@@ -207,7 +207,29 @@ func (o *ToHTTPProcedureSpec) Kind() plan.ProcedureKind {
 }
 
 func (o *ToHTTPProcedureSpec) Copy() plan.ProcedureSpec {
-	return &ToHTTPProcedureSpec{}
+	s := o.Spec
+	res := &ToHTTPProcedureSpec{
+		Spec: &ToHTTPOpSpec{
+			Addr:         s.Addr,
+			Method:       s.Method,
+			Name:         s.Name,
+			NameColumn:   s.NameColumn,
+			Headers:      make(map[string]string, len(s.Headers)),
+			URLParams:    make(map[string]string, len(s.URLParams)),
+			Timeout:      s.Timeout,
+			NoKeepAlive:  s.NoKeepAlive,
+			TimeColumn:   s.TimeColumn,
+			TagColumns:   append([]string(nil), s.TagColumns...),
+			ValueColumns: append([]string(nil), s.ValueColumns...),
+		},
+	}
+	for k, v := range s.Headers {
+		res.Spec.Headers[k] = v
+	}
+	for k, v := range s.URLParams {
+		res.Spec.URLParams[k] = v
+	}
+	return res
 }
 
 func newToHTTPProcedure(qs query.OperationSpec, a plan.Administration) (plan.ProcedureSpec, error) {
