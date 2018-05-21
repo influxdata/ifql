@@ -203,7 +203,7 @@ type ToHTTPProcedureSpec struct {
 }
 
 func (o *ToHTTPProcedureSpec) Kind() plan.ProcedureKind {
-	return CountKind
+	return ToHTTPKind
 }
 
 func (o *ToHTTPProcedureSpec) Copy() plan.ProcedureSpec {
