@@ -1,3 +1,7 @@
+# Deprecated 
+
+IFQL development has moved to https://github.com/influxdata/platform as the `query` package.
+
 # IFQL (Influx Query Language)
 
 `ifqld` is an HTTP server for running **IFQL** queries to one or more InfluxDB
